@@ -1,0 +1,12 @@
+# Secrets
+serper_key.txt
+.env
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Generated data / archives
+output_data/
+*.zip
