@@ -718,7 +718,7 @@ async def start_collect(req: CollectRequest, request: Request):
 @api.post("/api/stop")
 async def stop_collect(request: Request, req: StopRequest | None = None):
     try:
-        view = await hub.call("stop", timeout=15, client=client_of(request),
+        view = await hub.call("stop", timeout=45, client=client_of(request),
                               job_id=(req.job_id if req else "") or None)
     except (RpcError, WorkerUnavailable) as exc:
         raise worker_error(exc) from None

@@ -316,6 +316,13 @@ def worker_main(conn, resume=None, init=None):
     if hasattr(signal, "SIGBREAK"):          # Windows Ctrl+Break: same story
         signal.signal(signal.SIGBREAK, signal.SIG_IGN)
     listener = _setup_logging()
+    if hasattr(os, "nice"):
+        # Crawling must not starve the API process on a small CPU share:
+        # status polls, Stop and downloads stay responsive mid-collection.
+        try:
+            os.nice(10)
+        except OSError:
+            pass
     try:
         if init is not None:         # test hook: install simulators
             init()

@@ -34,6 +34,62 @@ def _int_env(name: str, default: int, lo: int, hi: int) -> int:
         return default
 
 
+def _read_first(*paths: str) -> str:
+    for p in paths:
+        try:
+            with open(p, encoding="ascii") as fh:
+                return fh.read().strip()
+        except OSError:
+            continue
+    return ""
+
+
+def _effective_cpus() -> float:
+    """CPUs this process may really use. os.cpu_count() reports the whole
+    host, so in a container with a CPU quota (Render free = 0.1 CPU) it can
+    be 8-64x too high. Reads the cgroup v2 / v1 quota; falls back to the
+    affinity mask / cpu_count when there is none (Windows, bare metal)."""
+    try:
+        n = float(len(os.sched_getaffinity(0)))
+    except (AttributeError, OSError):
+        n = float(os.cpu_count() or 4)
+    quota, period = None, None
+    v2 = _read_first("/sys/fs/cgroup/cpu.max").split()
+    if len(v2) == 2 and v2[0] != "max":
+        quota, period = v2
+    else:
+        q = _read_first("/sys/fs/cgroup/cpu/cpu.cfs_quota_us",
+                        "/sys/fs/cgroup/cpu,cpuacct/cpu.cfs_quota_us")
+        p = _read_first("/sys/fs/cgroup/cpu/cpu.cfs_period_us",
+                        "/sys/fs/cgroup/cpu,cpuacct/cpu.cfs_period_us")
+        if q and p and not q.startswith("-"):
+            quota, period = q, p
+    try:
+        if quota and period and float(period) > 0:
+            n = min(n, float(quota) / float(period))
+    except ValueError:
+        pass
+    return max(0.05, n)
+
+
+def _memory_limit_mb() -> float:
+    """Container memory limit in MB, or 0 when unlimited / unknown."""
+    raw = _read_first("/sys/fs/cgroup/memory.max",
+                      "/sys/fs/cgroup/memory/memory.limit_in_bytes")
+    try:
+        v = int(raw)
+    except ValueError:
+        return 0.0
+    return 0.0 if v >= 1 << 60 else v / (1024 * 1024)
+
+
+EFFECTIVE_CPUS = _effective_cpus()
+MEMORY_LIMIT_MB = _memory_limit_mb()
+# A small container (e.g. Render free: 0.1 CPU / 512 MB) gets defaults that
+# fit it; every value below can still be overridden by its env variable.
+SMALL_HOST = EFFECTIVE_CPUS < 1.0 or 0 < MEMORY_LIMIT_MB <= 1024
+
+
 _DOTENV_KEYS: set[str] = set()   # names whose value came from app/.env
 
 
@@ -78,7 +134,8 @@ STATE_PATH = os.path.join(OUTPUT_DIR, "demo_state.json")
 # (or the older APP_CRAWL_WORKERS) in .env, range 4..100. Crawling is
 # I/O-bound; robots.txt and per-site page limits are always respected.
 CRAWL_WORKERS = _int_env("SCRAPER_CONCURRENCY",
-                         _int_env("APP_CRAWL_WORKERS", 48, 4, 100), 4, 100)
+                         _int_env("APP_CRAWL_WORKERS", 16 if SMALL_HOST else 48,
+                                  4, 100), 4, 100)
 FETCH_TIMEOUT = (5, 12)          # (connect, read) - dead hosts fail fast
 EXPORT_MIN_INTERVAL = 30.0       # mid-run Excel regeneration (final export
                                  # always happens; the state JSON is the
@@ -88,7 +145,10 @@ STATE_SAVE_INTERVAL = 5.0
 # HTML parsing/extraction runs in worker processes (off the GIL).
 # 0 = parse inside crawl threads (old behaviour).
 ANALYZE_PROCESSES = _int_env("ANALYZE_PROCESSES",
-                             max(1, min(8, (os.cpu_count() or 4) - 2)), 0, 16)
+                             # each is a full Python process (~50 MB): none
+                             # on a small host, else one per spare real CPU
+                             0 if SMALL_HOST else
+                             max(1, min(8, int(EFFECTIVE_CPUS) - 2)), 0, 16)
 
 # ---- Serper client tuning (all overridable in .env) ------------------------
 SERPER_CONCURRENCY = _int_env("SERPER_CONCURRENCY", 6, 1, 16)  # requests in flight
@@ -141,12 +201,13 @@ MAX_CONTROLLER_ERRORS = 25       # consecutive controller-loop failures -> FAILE
 # MAX_ACTIVE_JOBS wait in a FIFO queue; a category is collected by one job at
 # a time (a second job for it queues behind the first); each client (browser)
 # may have MAX_JOBS_PER_CLIENT queued/running jobs.
-MAX_ACTIVE_JOBS = _int_env("MAX_ACTIVE_JOBS", 4, 1, 32)
+MAX_ACTIVE_JOBS = _int_env("MAX_ACTIVE_JOBS", 1 if SMALL_HOST else 4, 1, 32)
 MAX_QUEUED_JOBS = _int_env("MAX_QUEUED_JOBS", 500, 1, 10_000)
 MAX_JOBS_PER_CLIENT = _int_env("MAX_JOBS_PER_CLIENT", 1, 1, 10)
 # Crawl threads across ALL running jobs; each job gets an equal slice
 # (at most CRAWL_WORKERS, at least 8). Bounds threads / sockets / memory.
-GLOBAL_CRAWL_WORKERS = _int_env("GLOBAL_CRAWL_WORKERS", 192, 16, 800)
+GLOBAL_CRAWL_WORKERS = _int_env("GLOBAL_CRAWL_WORKERS", 16 if SMALL_HOST else 192,
+                                16, 800)
 JOB_HISTORY = 300                # finished jobs kept for their owners' status
 STATUS_PUBLISH_INTERVAL = 0.5    # worker -> API status bundle cadence (s)
 WORKER_RESTARTS_MAX = 5          # crash restarts per 10 min before giving up

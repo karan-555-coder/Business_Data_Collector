@@ -920,13 +920,35 @@ $('start').onclick = async () => {
     clearTimeout(pollTimer); pollLoop();
   } catch (e) { toast(e.message, 'bad', 'i-x'); $('start').disabled = false; }
 };
-$('stopBtn').onclick = () => api('/api/stop', {
-    method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({job_id: logJob || ''}),
-  })
-  .then(() => { toast('Stopping \u2014 everything found so far is saved', 'warn', 'i-stop');
-                clearTimeout(pollTimer); pollLoop(); })
-  .catch(e => toast(e.message, 'bad', 'i-x'));
+$('stopBtn').onclick = async () => {
+  const btn = $('stopBtn');
+  if (btn.disabled) return;
+  btn.disabled = true;
+  const label = btn.lastChild.textContent;
+  btn.lastChild.textContent = ' Stopping\u2026';
+  // A busy server can answer slowly or fail briefly: try a few times.
+  let err = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      await api('/api/stop', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({job_id: logJob || ''}),
+      });
+      err = null;
+      break;
+    } catch (e) {
+      err = e;
+      // Nothing left to stop: the collection already finished or stopped.
+      if (/no collection of yours/i.test(e.message)) { err = null; break; }
+      await new Promise(r => setTimeout(r, 2000));
+    }
+  }
+  btn.disabled = false;
+  btn.lastChild.textContent = label;
+  if (err) toast('Could not stop yet (' + err.message + ') \u2014 try again', 'bad', 'i-x');
+  else toast('Stopping \u2014 everything found so far is saved', 'warn', 'i-stop');
+  clearTimeout(pollTimer); pollLoop();
+};
 
 /* ---------- live poll ---------- */
 function setText(id, v) { $(id).textContent = v; }
@@ -999,6 +1021,7 @@ function renderFeed(lines, replace) {
 /* Poll cadence comes from the server (poll_ms: 3 s while your collection
    runs, 10 s otherwise); 30 s in a background tab; exponential backoff
    while the server is unreachable or busy. */
+let lastFilesRefresh = 0;
 let pollTimer = null, pollMs = 3000, pollFailures = 0, pollBusy = false, pollAgain = false;
 async function pollLoop() {
   clearTimeout(pollTimer);
@@ -1041,6 +1064,12 @@ async function poll() {
   $('progressCard').style.display = 'block';
 
   const running = ACTIVE.includes(j.status);
+  // Excel files are rewritten about every 30 s during a run: keep the
+  // download buttons current instead of refreshing them only at the end.
+  if (running && Date.now() - lastFilesRefresh > 20000) {
+    lastFilesRefresh = Date.now();
+    refreshFiles();
+  }
   const recovering = j.status === 'recovering';
   const waiting = j.status === 'waiting';
   const queued = j.status === 'queued' || j.status === 'pending';
