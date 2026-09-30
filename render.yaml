@@ -1,0 +1,23 @@
+# Render Blueprint: the backend (FastAPI API + its collection worker).
+# One instance by design - jobs live in the worker process the API supervises.
+services:
+  - type: web
+    name: business-data-collector
+    runtime: python
+    plan: free
+    rootDir: app
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m backend.serve --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.10
+      - key: SERPER_API_KEY
+        sync: false          # entered in the Render dashboard, never committed
+      - key: APP_AUTH_TOKEN
+        sync: false          # access code the web page asks for
+      - key: APP_FORCE_HTTPS
+        value: "1"
+      - key: FORWARDED_ALLOW_IPS
+        value: "*"           # only Render's proxy can reach the app
