@@ -21,3 +21,10 @@ services:
         value: "1"
       - key: FORWARDED_ALLOW_IPS
         value: "*"           # only Render's proxy can reach the app
+      # Sized for the free plan (0.1 CPU / 512 MB). Remove on a bigger plan.
+      - key: MAX_ACTIVE_JOBS
+        value: "1"
+      - key: GLOBAL_CRAWL_WORKERS
+        value: "32"
+      - key: SCRAPER_CONCURRENCY
+        value: "32"

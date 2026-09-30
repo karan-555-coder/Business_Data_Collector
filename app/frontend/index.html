@@ -529,6 +529,15 @@ const displayNames = {};
 // local backend directly instead of using relative URLs.
 const IS_FILE = !(location.protocol === 'http:' || location.protocol === 'https:');
 const API_BASE = IS_FILE ? 'http://127.0.0.1:8100' : '';
+// Served from a public host (Vercel/Render), not this PC or the LAN: the
+// start_app.bat hints and the 127.0.0.1 redirect do not apply there.
+const IS_HOSTED = !IS_FILE &&
+  !/^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(location.hostname);
+if (IS_HOSTED) {
+  document.getElementById('apiErrMsg').textContent =
+    'Cannot reach the server - it may be starting up (up to a minute after ' +
+    'a quiet period) or busy with a collection. This page reconnects automatically.';
+}
 
 // A file-opened page is second-class (Chrome restricts localhost calls from
 // file:// pages): as soon as the backend answers, move to the served app.
@@ -790,7 +799,7 @@ async function refreshFiles() {
 const APP_URL = 'http://127.0.0.1:8100/';
 let redirectProbeTimer = null;
 function probeAppAndRedirect() {
-  if (IS_FILE || redirectProbeTimer || location.href.startsWith(APP_URL)) return;
+  if (IS_FILE || IS_HOSTED || redirectProbeTimer || location.href.startsWith(APP_URL)) return;
   const msg = document.getElementById('apiErrMsg');
   msg.innerHTML = 'This page is not being served by the app (' +
     location.host.replace(/[<>&"]/g, '') + '). Open it at ' +
