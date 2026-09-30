@@ -1,0 +1,1202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f6f7f9" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e1218" media="(prefers-color-scheme: dark)">
+<title>Business Data Collector</title>
+<link rel="icon" href="/favicon.ico" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f6f7f9; --surface: #ffffff; --surface-2: #f1f3f6;
+    --border: #e4e8ee; --border-strong: #d3dae3;
+    --ink: #16212e; --ink-2: #5b6b7d; --ink-3: #8a99ab;
+    --accent: #4f46e5; --accent-hover: #4338ca; --accent-soft: #eef0fe;
+    --accent-ink: #ffffff;
+    --good: #15803d; --good-soft: #e8f6ee;
+    --warn: #b45309; --warn-soft: #fdf3e3;
+    --bad: #b91c1c;  --bad-soft: #fdecec;
+    --shadow: 0 1px 2px rgba(22,33,46,.05), 0 4px 16px rgba(22,33,46,.06);
+    --shadow-lg: 0 8px 30px rgba(22,33,46,.12);
+    --radius: 14px; --radius-sm: 9px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0e1218; --surface: #161c25; --surface-2: #1c242f;
+      --border: #262f3c; --border-strong: #34404f;
+      --ink: #e7ecf2; --ink-2: #9aa8b8; --ink-3: #6b7a8c;
+      --accent: #7b74f0; --accent-hover: #928cf4; --accent-soft: #23263e;
+      --accent-ink: #0e1218;
+      --good: #4ade80; --good-soft: #14291d;
+      --warn: #fbbf24; --warn-soft: #2d2312;
+      --bad: #f87171;  --bad-soft: #321a1a;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 16px rgba(0,0,0,.25);
+      --shadow-lg: 0 8px 30px rgba(0,0,0,.45);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e1218; --surface: #161c25; --surface-2: #1c242f;
+    --border: #262f3c; --border-strong: #34404f;
+    --ink: #e7ecf2; --ink-2: #9aa8b8; --ink-3: #6b7a8c;
+    --accent: #7b74f0; --accent-hover: #928cf4; --accent-soft: #23263e;
+    --accent-ink: #0e1218;
+    --good: #4ade80; --good-soft: #14291d;
+    --warn: #fbbf24; --warn-soft: #2d2312;
+    --bad: #f87171;  --bad-soft: #321a1a;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 16px rgba(0,0,0,.25);
+    --shadow-lg: 0 8px 30px rgba(0,0,0,.45);
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 15px/1.55 "Inter", "Segoe UI", system-ui, sans-serif;
+         -webkit-font-smoothing: antialiased; }
+  svg { flex-shrink: 0; }
+  button, input, select, summary, a.btn-dl { touch-action: manipulation; }
+  .wrap { max-width: 860px; margin: 0 auto;
+          padding: 26px 16px calc(80px + env(safe-area-inset-bottom));
+          padding-left: max(16px, env(safe-area-inset-left));
+          padding-right: max(16px, env(safe-area-inset-right)); }
+
+  /* ---------- header ---------- */
+  .top { display: flex; align-items: center; justify-content: space-between;
+         margin-bottom: 26px; gap: 12px; flex-wrap: wrap; }
+  .brand { display: flex; align-items: center; gap: 11px; }
+  .brand-mark { width: 38px; height: 38px; border-radius: 10px; background: var(--accent);
+                display: grid; place-items: center; color: var(--accent-ink); }
+  .brand-name { font-weight: 800; font-size: 16.5px; letter-spacing: -.01em; }
+  .brand-sub { font-size: 12px; color: var(--ink-3); }
+  .status-dots { display: flex; gap: 14px; font-size: 12px; color: var(--ink-2);
+                 font-weight: 500; }
+  .conn { display: flex; align-items: center; gap: 7px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-3); }
+  .dot.on { background: var(--good); box-shadow: 0 0 0 3px var(--good-soft); }
+  .dot.off { background: var(--bad); box-shadow: 0 0 0 3px var(--bad-soft); }
+
+  .banner { display: none; align-items: center; gap: 10px; margin-bottom: 18px;
+            background: var(--bad-soft); color: var(--bad); border: 1px solid var(--bad);
+            border-radius: var(--radius); padding: 12px 16px; font-weight: 500; font-size: 13px; }
+  .banner code { background: transparent; font-weight: 700; }
+
+  .panel { background: var(--surface); border: 1px solid var(--border);
+           border-radius: var(--radius); box-shadow: var(--shadow);
+           padding: 26px 28px; margin-bottom: 20px; }
+  @media (max-width: 620px) { .panel { padding: 20px 16px; } }
+  .step { font-size: 13px; font-weight: 700; color: var(--ink-2); margin: 0 0 10px;
+          display: flex; align-items: center; gap: 9px; }
+  .step .n { width: 22px; height: 22px; border-radius: 50%; background: var(--accent-soft);
+             color: var(--accent); display: grid; place-items: center; font-size: 12px;
+             font-weight: 800; }
+  .gap { height: 24px; }
+
+  /* ---------- category chips ---------- */
+  .cat-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .cat-chip { display: inline-flex; align-items: center; gap: 7px; padding: 9px 15px;
+              border-radius: 99px; border: 1.5px solid var(--border-strong);
+              background: var(--surface); color: var(--ink-2); font-size: 13.5px;
+              font-weight: 600; cursor: pointer; font-family: inherit;
+              transition: all .13s; }
+  .cat-chip:hover { border-color: var(--accent); color: var(--accent); }
+  .cat-chip.on { background: var(--accent); border-color: var(--accent);
+                 color: var(--accent-ink); }
+  .cat-chip.custom { border-style: dashed; }
+
+  /* ---------- inputs ---------- */
+  label { display: block; font-size: 12.5px; color: var(--ink-2); font-weight: 600;
+          margin: 0 0 6px; }
+  label small { font-weight: 400; color: var(--ink-3); }
+  input, select {
+    width: 100%; padding: 11px 14px; border: 1.5px solid var(--border-strong);
+    border-radius: var(--radius-sm); background: var(--surface); color: var(--ink);
+    font-size: 14.5px; font-family: inherit; transition: border-color .15s, box-shadow .15s;
+  }
+  input:focus, select:focus { outline: none; border-color: var(--accent);
+                              box-shadow: 0 0 0 3px var(--accent-soft); }
+  .loc-row { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 10px; }
+  @media (max-width: 620px) { .loc-row { grid-template-columns: 1fr; } }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+  .chip-kw { font-size: 12px; font-weight: 600; padding: 4px 12px; border-radius: 99px;
+             background: var(--surface-2); border: 1px solid var(--border-strong);
+             color: var(--ink-2); cursor: pointer; font-family: inherit; transition: all .12s; }
+  .chip-kw:hover { border-color: var(--accent); color: var(--accent); }
+  .chip-kw.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+
+  /* ---------- advanced ---------- */
+  details.adv { margin-top: 22px; border-top: 1px solid var(--border); padding-top: 14px; }
+  details.adv summary { cursor: pointer; font-size: 13px; font-weight: 600;
+                        color: var(--ink-3); list-style: none; display: flex;
+                        align-items: center; gap: 7px; user-select: none; }
+  details.adv summary::-webkit-details-marker { display: none; }
+  details.adv summary .chev { transition: transform .2s; }
+  details.adv[open] summary .chev { transform: rotate(90deg); }
+  .adv-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 14px; }
+  @media (max-width: 620px) { .adv-grid { grid-template-columns: 1fr; } }
+  .estimate { font-size: 12px; color: var(--ink-3); margin-top: 10px; }
+
+  /* ---------- buttons ---------- */
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+         cursor: pointer; border: 1.5px solid transparent; border-radius: var(--radius-sm);
+         padding: 12px 22px; font-size: 15px; font-weight: 700; font-family: inherit;
+         transition: background .15s, transform .05s; }
+  .btn:active { transform: translateY(1px); }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .btn-primary { width: 100%; margin-top: 24px; padding: 15px; font-size: 16px;
+                 background: var(--accent); color: var(--accent-ink);
+                 box-shadow: var(--shadow); border-radius: 12px; }
+  .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+  .btn-stop { background: transparent; color: var(--bad); border-color: var(--bad);
+              padding: 9px 18px; font-size: 13.5px; }
+  .btn-stop:hover { background: var(--bad-soft); }
+  .btn-dl { background: var(--surface); border-color: var(--border-strong);
+            color: var(--ink); padding: 9px 15px; font-size: 13px; text-decoration: none; }
+  .btn-dl:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-dl svg { color: var(--good); }
+
+  .keywarn { display: none; gap: 8px; align-items: flex-start; margin-top: 14px;
+             color: var(--bad); background: var(--bad-soft); border-radius: var(--radius-sm);
+             padding: 11px 13px; font-size: 12.5px; font-weight: 500; }
+
+  /* ---------- progress ---------- */
+  .prog-head { display: flex; align-items: center; justify-content: space-between;
+               gap: 10px; flex-wrap: wrap; }
+  .prog-title { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 9px; }
+  .spin { animation: spin 1s linear infinite; color: var(--accent); }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .prog-big { display: flex; align-items: baseline; gap: 16px; margin: 16px 0 4px;
+              flex-wrap: wrap; }
+  .prog-pct { font-size: 40px; font-weight: 800; letter-spacing: -.03em; line-height: 1; }
+  .prog-found { font-size: 14px; color: var(--ink-2); font-weight: 600; }
+  .meter { height: 12px; background: var(--surface-2); border-radius: 99px;
+           overflow: hidden; margin: 12px 0; }
+  .meter-fill { height: 100%; width: 0; background: var(--accent); border-radius: 99px;
+                transition: width .5s ease; position: relative; overflow: hidden; }
+  .meter-fill.active::after {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.35), transparent);
+    animation: shimmer 1.6s infinite;
+  }
+  @keyframes shimmer { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+  .activity-now { display: flex; align-items: center; gap: 9px; font-size: 13.5px;
+                  color: var(--ink-2); min-height: 22px; }
+  .activity-now svg { color: var(--accent); }
+  .status-msg { font-size: 13.5px; font-weight: 600; padding: 10px 14px;
+                border-radius: var(--radius-sm); margin-top: 12px; display: none; }
+  .status-msg.done, .status-msg.completed { display: block; background: var(--good-soft); color: var(--good); }
+  .status-msg.stopped, .status-msg.exhausted, .status-msg.recovering, .status-msg.waiting, .status-msg.queued { display: block; background: var(--warn-soft); color: var(--warn); }
+  .status-msg.error, .status-msg.failed { display: block; background: var(--bad-soft); color: var(--bad); }
+
+  details.more { margin-top: 14px; }
+  details.more summary { cursor: pointer; font-size: 12.5px; font-weight: 600;
+                         color: var(--ink-3); list-style: none; user-select: none; }
+  details.more summary::-webkit-details-marker { display: none; }
+  .mini-stats { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 12px 0; }
+  .mini { font-size: 12px; color: var(--ink-2); }
+  .mini b { color: var(--ink); font-weight: 700; }
+  .feed { max-height: 230px; overflow-y: auto; }
+  .feed-row { display: flex; gap: 9px; padding: 6px 2px; border-bottom: 1px solid var(--border);
+              font-size: 12.5px; align-items: flex-start; }
+  .feed-row:last-child { border-bottom: 0; }
+  .feed-ico { width: 20px; height: 20px; border-radius: 6px; display: grid; place-items: center;
+              flex-shrink: 0; margin-top: 1px; background: var(--surface-2); color: var(--ink-3); }
+  .feed-ico.found { background: var(--good-soft); color: var(--good); }
+  .feed-ico.dup, .feed-ico.reject { background: var(--warn-soft); color: var(--warn); }
+  .feed-ico.fail { background: var(--bad-soft); color: var(--bad); }
+  .feed-ico.search { background: var(--accent-soft); color: var(--accent); }
+  .feed-time { color: var(--ink-3); font-size: 11px; font-variant-numeric: tabular-nums;
+               flex-shrink: 0; margin-top: 2px; width: 50px; }
+  .feed-msg { color: var(--ink-2); word-break: break-word; min-width: 0; }
+  .feed-msg b { color: var(--ink); font-weight: 600; }
+
+  /* ---------- results ---------- */
+  .sec-title { font-size: 17px; font-weight: 800; letter-spacing: -.01em;
+               margin: 30px 0 14px; }
+  .count-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .count-chip { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px;
+                border-radius: 99px; border: 1.5px solid var(--border-strong);
+                background: var(--surface); font-size: 13px; font-weight: 600;
+                color: var(--ink-2); cursor: pointer; font-family: inherit; transition: all .13s; }
+  .count-chip:hover { border-color: var(--accent); color: var(--accent); }
+  .count-chip.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+  .count-chip .num { background: var(--surface-2); border-radius: 99px; padding: 1px 9px;
+                     font-size: 12px; font-weight: 800; color: var(--ink); }
+  .count-chip.on .num { background: var(--surface); }
+  .count-chip .del { display: inline-flex; align-items: center; justify-content: center;
+                     width: 18px; height: 18px; border-radius: 50%; color: var(--ink-3);
+                     font-size: 13px; line-height: 1; margin: 0 -4px 0 2px; }
+  .count-chip .del:hover { background: var(--bad-soft); color: var(--bad); }
+  .downloads { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+
+  .table-card { padding: 0; overflow: hidden; }
+  .toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+             padding: 14px 18px; border-bottom: 1px solid var(--border); }
+  .search-wrap { position: relative; flex: 1; min-width: 180px; max-width: 320px; }
+  .search-wrap svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+                     color: var(--ink-3); pointer-events: none; }
+  .search-wrap input { padding: 9px 12px 9px 36px; font-size: 13.5px; }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+  th { color: var(--ink-2); font-size: 11px; text-transform: uppercase; letter-spacing: .05em;
+       font-weight: 700; white-space: nowrap; cursor: pointer; user-select: none;
+       background: var(--surface-2); }
+  th .arrow { color: var(--accent); font-size: 10px; }
+  td { max-width: 230px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+       color: var(--ink-2); }
+  td:first-child { color: var(--ink); font-weight: 600; }
+  tbody tr:hover { background: var(--surface-2); }
+  td a { color: var(--accent); text-decoration: none; }
+  td a:hover { text-decoration: underline; }
+  .pager { display: flex; align-items: center; justify-content: space-between;
+           padding: 12px 18px; font-size: 12.5px; color: var(--ink-2); flex-wrap: wrap; gap: 8px; }
+  .pager .btns { display: flex; gap: 6px; }
+  .btn-pg { background: var(--surface); border: 1px solid var(--border-strong);
+            color: var(--ink-2); padding: 6px 12px; font-size: 12.5px; border-radius: 7px;
+            font-weight: 600; cursor: pointer; font-family: inherit; }
+  .btn-pg:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  .btn-pg:disabled { opacity: .4; cursor: not-allowed; }
+  .empty { padding: 34px 16px; color: var(--ink-3); text-align: center; font-size: 13.5px; }
+
+  /* ---------- toasts ---------- */
+  #toasts { position: fixed; right: 18px; bottom: 18px; display: flex;
+            flex-direction: column; gap: 8px; z-index: 99; }
+  .toast { display: flex; align-items: center; gap: 10px; background: var(--surface);
+           border: 1px solid var(--border); border-left: 3px solid var(--accent);
+           border-radius: var(--radius-sm); box-shadow: var(--shadow-lg);
+           padding: 11px 14px; font-size: 13px; font-weight: 500; max-width: 340px;
+           animation: slide-in .25s ease; }
+  .toast.good { border-left-color: var(--good); } .toast.good svg { color: var(--good); }
+  .toast.bad  { border-left-color: var(--bad); }  .toast.bad svg  { color: var(--bad); }
+  .toast.warn { border-left-color: var(--warn); } .toast.warn svg { color: var(--warn); }
+  .toast svg { color: var(--accent); }
+  @keyframes slide-in { from { opacity: 0; transform: translateY(8px); } }
+  .toast.out { opacity: 0; transform: translateY(8px); transition: all .3s; }
+
+  /* ---------- touch devices: bigger tap targets, momentum scrolling ---------- */
+  .table-wrap, .feed { -webkit-overflow-scrolling: touch; }
+  @media (pointer: coarse) {
+    .cat-chip { padding: 11px 17px; }
+    .chip-kw { padding: 7px 14px; font-size: 12.5px; }
+    .count-chip { padding: 11px 16px; }
+    .btn-pg { padding: 10px 16px; }
+    .btn-stop { padding: 11px 20px; }
+    details.adv summary, details.more summary { padding: 8px 0; }
+    th, td { padding: 12px 14px; }
+  }
+
+  /* ---------- tablets ---------- */
+  @media (max-width: 820px) {
+    .wrap { padding-top: 18px; }
+    .top { margin-bottom: 18px; }
+  }
+
+  /* ---------- phones ---------- */
+  @media (max-width: 620px) {
+    body { font-size: 14.5px; }
+    /* 16px inputs stop iOS Safari from zooming in on focus */
+    input, select { font-size: 16px; padding: 12px 14px; }
+    .search-wrap input { font-size: 16px; }
+    .brand-name { font-size: 15px; }
+    .brand-sub { display: none; }
+    .status-dots { font-size: 11.5px; gap: 10px; }
+    .prog-pct { font-size: 32px; }
+    .prog-found { font-size: 13px; }
+    .sec-title { margin-top: 22px; }
+    .btn-primary { padding: 16px; }
+    .pager { flex-direction: column; align-items: stretch; text-align: center; }
+    .pager .btns { justify-content: center; }
+    .pager .btns .btn-pg { flex: 1; }
+    .toolbar { padding: 12px; }
+    .search-wrap { max-width: none; }
+    #toasts { left: 12px; right: 12px;
+              bottom: calc(12px + env(safe-area-inset-bottom)); }
+    .toast { max-width: none; width: 100%; }
+  }
+
+  /* ---------- small phones: records table becomes stacked cards ---------- */
+  @media (max-width: 560px) {
+    .table-wrap table, .table-wrap tbody, .table-wrap tr, .table-wrap td {
+      display: block; width: 100%;
+    }
+    .table-wrap thead { display: none; }
+    .table-wrap tr { border: 1px solid var(--border); border-radius: 10px;
+                     margin: 10px 12px; padding: 6px 0; background: var(--surface); }
+    .table-wrap td { display: grid; grid-template-columns: 84px 1fr; gap: 8px;
+                     align-items: baseline; border-bottom: 0; padding: 5px 14px;
+                     max-width: none; white-space: normal; overflow: visible;
+                     text-overflow: clip; word-break: break-word; }
+    .table-wrap td:empty { display: none; }
+    .table-wrap td::before { content: attr(data-label); font-size: 10.5px;
+                             text-transform: uppercase; letter-spacing: .05em;
+                             color: var(--ink-3); font-weight: 700; }
+    .table-wrap td:first-child { font-size: 14.5px; padding-top: 8px; }
+    tbody tr:hover { background: var(--surface); }
+  }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <g id="i-radar"><path d="M12 3a9 9 0 1 0 9 9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M12 7a5 5 0 1 0 5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><path d="M12 12l6.5-6.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></g>
+    <g id="i-search"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M16.5 16.5L21 21" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></g>
+    <g id="i-stop"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/></g>
+    <g id="i-globe"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18" fill="none" stroke="currentColor" stroke-width="2"/></g>
+    <g id="i-copy"><rect x="9" y="9" width="12" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" fill="none" stroke="currentColor" stroke-width="2"/></g>
+    <g id="i-check"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8.5 12l2.5 2.5 4.5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></g>
+    <g id="i-alert"><path d="M12 3L2 20h20z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 10v4m0 3v.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></g>
+    <g id="i-x"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M9 9l6 6m0-6l-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></g>
+    <g id="i-info"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 11v5m0-8v.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></g>
+    <g id="i-loader"><path d="M12 3a9 9 0 1 1-9 9" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></g>
+    <g id="i-download"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></g>
+    <g id="i-play"><path d="M7 4.5v15l13-7.5z" fill="currentColor"/></g>
+    <g id="i-chev"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></g>
+    <g id="i-folder"><path d="M3 7a2 2 0 0 1 2-2h4l2 3h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></g>
+  </defs>
+</svg>
+
+<div class="wrap">
+  <!-- header -->
+  <div class="top">
+    <div class="brand">
+      <div class="brand-mark"><svg width="21" height="21" viewBox="0 0 24 24"><use href="#i-radar"/></svg></div>
+      <div>
+        <div class="brand-name">Business Data Collector</div>
+        <div class="brand-sub">Find companies with contact details, exported to Excel</div>
+      </div>
+    </div>
+    <div class="status-dots">
+      <span class="conn"><span id="connDot" class="dot"></span><span id="connText">Connecting&hellip;</span></span>
+      <span class="conn"><span id="keyDot" class="dot"></span><span id="keyText">API key</span></span>
+      <span class="conn" id="slotsChip" style="display:none"><span id="slotsDot" class="dot on"></span><span id="slotsText"></span></span>
+    </div>
+  </div>
+
+  <div id="apiErr" class="banner">
+    <svg width="18" height="18" viewBox="0 0 24 24"><use href="#i-alert"/></svg>
+    <span id="apiErrMsg">Cannot reach the app &mdash; it is not running. Double-click
+    <code>start_app.bat</code> in the app folder. This page reconnects automatically.</span>
+  </div>
+
+  <!-- ============ SEARCH CARD ============ -->
+  <section class="panel">
+    <div class="step"><span class="n">1</span> What are you looking for?</div>
+    <div id="catChips" class="cat-chips"></div>
+    <input id="customName" placeholder="Type any category, e.g. Cybersecurity companies"
+           maxlength="60" style="display:none;margin-top:10px">
+
+    <div class="gap"></div>
+    <div class="step"><span class="n">2</span> Where?</div>
+    <div class="loc-row">
+      <div>
+        <label>Country</label>
+        <input id="country" list="countryList" placeholder="USA, India, UK, UAE&hellip;">
+        <datalist id="countryList"></datalist>
+      </div>
+      <div>
+        <label>State / Region <small>(optional)</small></label>
+        <input id="state" list="stateList" placeholder="California&hellip;">
+        <datalist id="stateList"></datalist>
+      </div>
+      <div>
+        <label>City <small>(optional)</small></label>
+        <input id="city" placeholder="Los Angeles&hellip;">
+      </div>
+    </div>
+
+    <div class="gap"></div>
+    <div class="step"><span class="n">3</span> Keywords <span style="font-weight:400;color:var(--ink-3)">&mdash; optional</span></div>
+    <input id="keywords" placeholder="e.g. CPA, Accounting, Tax">
+    <div id="kwChips" class="chips"></div>
+
+    <details class="adv">
+      <summary><svg class="chev" width="13" height="13" viewBox="0 0 24 24"><use href="#i-chev"/></svg>
+        Advanced options</summary>
+      <div class="adv-grid">
+        <div><label>Target records</label><select id="target"></select></div>
+        <div><label>Max search queries</label><input id="maxq" type="number" min="1" max="400" value="12"></div>
+        <div><label>Search provider</label>
+          <select id="provider"><option value="serper">Serper (Google)</option></select></div>
+      </div>
+      <div class="estimate" id="estimate"></div>
+    </details>
+
+    <div id="keywarn" class="keywarn">
+      <svg width="15" height="15" viewBox="0 0 24 24" style="margin-top:1px"><use href="#i-alert"/></svg>
+      <span>The Serper API key is missing &mdash; copy <b>.env.example</b> to <b>app/.env</b>,
+      set your key, and restart the app.</span>
+    </div>
+
+    <button id="start" class="btn btn-primary">
+      <svg width="18" height="18" viewBox="0 0 24 24"><use href="#i-search"/></svg>
+      Start search</button>
+  </section>
+
+  <!-- ============ PROGRESS CARD ============ -->
+  <section id="progressCard" class="panel" style="display:none">
+    <div class="prog-head">
+      <div class="prog-title">
+        <svg id="progIcon" class="spin" width="18" height="18" viewBox="0 0 24 24"><use href="#i-loader"/></svg>
+        <span id="progTitle">Searching&hellip;</span>
+      </div>
+      <button id="stopBtn" class="btn btn-stop" style="display:none">
+        <svg width="12" height="12" viewBox="0 0 24 24"><use href="#i-stop"/></svg>
+        Stop</button>
+    </div>
+    <div class="prog-big">
+      <span class="prog-pct" id="pPct">0%</span>
+      <span class="prog-found"><b id="pCollected">0</b> of <span id="pTarget">&ndash;</span> records found</span>
+    </div>
+    <div class="meter"><div id="meterFill" class="meter-fill"></div></div>
+    <div class="activity-now">
+      <svg width="14" height="14" viewBox="0 0 24 24"><use href="#i-globe"/></svg>
+      <span id="activityNow">Waiting to start&hellip;</span>
+    </div>
+    <div id="statusMsg" class="status-msg"></div>
+    <details class="more">
+      <summary>Show details &amp; activity log</summary>
+      <div class="mini-stats">
+        <span class="mini">Emails <b id="s_email">0</b></span>
+        <span class="mini">Phones <b id="s_phone">0</b></span>
+        <span class="mini">Websites <b id="s_web">0</b></span>
+        <span class="mini">Duplicates removed <b id="s_dups">0</b></span>
+        <span class="mini">Queries <b id="s_queries">0</b></span>
+        <span class="mini">Failed URLs <b id="s_fail">0</b></span>
+        <span class="mini">Serper credits <b id="s_credits">0</b></span>
+      </div>
+      <div class="mini-stats" title="Serper credit efficiency for this run">
+        <span class="mini">Places credits <b id="c_places">0</b></span>
+        <span class="mini">Organic credits <b id="c_organic">0</b></span>
+        <span class="mini">Cached / skipped searches <b id="c_saved_q">0</b></span>
+        <span class="mini">New domains <b id="c_new">0</b></span>
+        <span class="mini">Duplicate results <b id="c_dup">0</b></span>
+        <span class="mini">Valid per credit <b id="c_vpc">&ndash;</b></span>
+        <span class="mini">Credits per valid <b id="c_cpv">&ndash;</b></span>
+        <span class="mini">Est. credits saved <b id="c_saved">0</b></span>
+      </div>
+      <div id="feed" class="feed"></div>
+    </details>
+  </section>
+
+  <!-- ============ RESULTS ============ -->
+  <section id="resultsSec" style="display:none">
+    <div class="sec-title">Results</div>
+    <div id="countChips" class="count-chips"></div>
+    <div id="downloads" class="downloads"></div>
+
+    <div class="gap"></div>
+    <div class="panel table-card">
+      <div class="toolbar">
+        <div class="search-wrap">
+          <svg width="15" height="15" viewBox="0 0 24 24"><use href="#i-search"/></svg>
+          <input id="recSearch" placeholder="Search results&hellip;">
+        </div>
+        <span style="margin-left:auto;font-size:12.5px;color:var(--ink-3)" id="recCount"></span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr id="recHead"></tr></thead>
+          <tbody id="recRows"></tbody>
+        </table>
+      </div>
+      <div id="recEmpty" class="empty" style="display:none">No records in this category yet.</div>
+      <div class="pager">
+        <span id="pageInfo"></span>
+        <div class="btns">
+          <button id="prevPg" class="btn-pg">&larr; Prev</button>
+          <button id="nextPg" class="btn-pg">Next &rarr;</button>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div id="toasts"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+let cfg = null, currentCat = 'Finance', selectedCat = 'Finance', creditsPerQuery = 2;
+let lastPerCat = null, allRecords = [], recPage = 1, lastStatus = null;
+let recSort = {key: 'Collected At', dir: -1};
+const PAGE_SIZE = 10;
+const displayNames = {};
+
+// When the page is opened as a file (or from another server), talk to the
+// local backend directly instead of using relative URLs.
+const IS_FILE = !(location.protocol === 'http:' || location.protocol === 'https:');
+const API_BASE = IS_FILE ? 'http://127.0.0.1:8100' : '';
+
+// A file-opened page is second-class (Chrome restricts localhost calls from
+// file:// pages): as soon as the backend answers, move to the served app.
+if (IS_FILE) {
+  const msg = document.getElementById('apiErrMsg');
+  msg.innerHTML = 'You opened the HTML file directly. Use the app at ' +
+    '<a href="http://127.0.0.1:8100" style="color:inherit;font-weight:700">' +
+    'http://127.0.0.1:8100</a> instead &mdash; if that link fails, double-click ' +
+    '<code>start_app.bat</code> in the app folder first. Redirecting automatically ' +
+    'once the backend answers&hellip;';
+  const probe = () => fetch('http://127.0.0.1:8100/api/config', {cache: 'no-store'})
+    .then(r => { if (r.ok) location.replace('http://127.0.0.1:8100/'); })
+    .catch(() => {});
+  probe();
+  setInterval(probe, 2500);
+}
+
+/* Optional access code (when the server sets APP_AUTH_TOKEN). Stored only in
+   this browser; sent as a header, never in URLs. */
+function getToken() {
+  try { return localStorage.getItem('bdc_token') || ''; } catch (e) { return ''; }
+}
+/* Anonymous client id: every browser gets its own collection (jobs of
+   different users run side by side). Random, stored only in this browser,
+   never derived from anything personal. */
+let memClientId = '';
+function newClientId() {
+  const b = new Uint8Array(16);
+  crypto.getRandomValues(b);   // works on plain-http LAN addresses too
+  return Array.from(b, x => x.toString(16).padStart(2, '0')).join('');
+}
+function clientId() {
+  try {
+    let id = localStorage.getItem('bdc_client');
+    if (!id || !/^[A-Za-z0-9_-]{16,64}$/.test(id)) {
+      id = newClientId();
+      localStorage.setItem('bdc_client', id);
+    }
+    return id;
+  } catch (e) {
+    return memClientId || (memClientId = newClientId());
+  }
+}
+function authHeaders() {
+  const t = getToken();
+  const h = {'X-Client-Id': clientId()};
+  if (t) h['X-Auth-Token'] = t;
+  return h;
+}
+async function api(path, opts, retried) {
+  opts = opts || {};
+  opts.headers = Object.assign({}, opts.headers || {}, authHeaders());
+  const r = await fetch(API_BASE + path, opts);
+  if (r.status === 401 && !retried) {
+    const code = prompt('This app is protected. Enter the access code:');
+    if (code) {
+      try { localStorage.setItem('bdc_token', code.trim()); } catch (e) {}
+      return api(path, opts, true);
+    }
+  }
+  if (!r.ok) {
+    let msg = r.statusText;
+    try { msg = (await r.json()).detail || msg; } catch (e) {}
+    throw new Error(msg);
+  }
+  return r.json();
+}
+
+function toast(msg, type = '', icon = 'i-info') {
+  const t = document.createElement('div');
+  t.className = 'toast ' + type;
+  t.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24"><use href="#${icon}"/></svg><span></span>`;
+  t.querySelector('span').textContent = msg;
+  $('toasts').appendChild(t);
+  setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 350); }, 4200);
+}
+
+function setConnected(ok) {
+  $('connDot').className = 'dot ' + (ok ? 'on' : 'off');
+  $('connText').textContent = ok ? 'Connected' : 'Offline';
+  $('apiErr').style.display = ok ? 'none' : 'flex';
+}
+
+/* ---------- location datalists ---------- */
+const COUNTRIES = ['USA', 'India', 'UK', 'Canada', 'Australia', 'UAE', 'Singapore',
+  'Ireland', 'Germany', 'Netherlands', 'South Africa', 'New Zealand', 'Philippines',
+  'Malaysia', 'Hong Kong', 'Switzerland', 'France', 'Spain', 'Italy', 'Sweden',
+  'Poland', 'Saudi Arabia', 'Qatar', 'Nigeria', 'Kenya', 'Japan', 'China',
+  'Indonesia', 'Thailand', 'Brazil', 'Mexico', 'Belgium', 'Austria', 'Denmark',
+  'Norway', 'Finland', 'Portugal'];
+const US_STATES = ['California', 'Texas', 'New York', 'Florida', 'Illinois',
+  'Pennsylvania', 'Ohio', 'North Carolina', 'Virginia', 'Massachusetts',
+  'New Jersey', 'Georgia', 'Colorado', 'Washington', 'Tennessee', 'Michigan',
+  'Arizona', 'Minnesota', 'Maryland', 'Connecticut'];
+function fillDatalist(id, values) {
+  const dl = $(id);
+  dl.innerHTML = '';
+  values.forEach(v => {
+    const o = document.createElement('option');
+    o.value = v;
+    dl.appendChild(o);
+  });
+}
+function updateStateList() {
+  const isUS = /^(usa|us|u\.s\.a?\.?|united states( of america)?|america)$/i
+    .test($('country').value.trim());
+  fillDatalist('stateList', isUS ? US_STATES : []);
+}
+
+/* ---------- category selector chips ---------- */
+let catKeySet = '';
+function renderCatChips(perCat) {
+  const wrap = $('catChips');
+  wrap.innerHTML = '';
+  Object.entries(perCat).forEach(([slug, c]) => {
+    displayNames[slug] = c.display;
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'cat-chip' + (selectedCat === slug ? ' on' : '');
+    b.textContent = c.display;
+    b.onclick = () => {
+      selectedCat = slug;
+      currentCat = slug;
+      $('customName').style.display = 'none';
+      renderCatChips(lastPerCat || perCat);
+      renderChips();
+      renderCountChips();
+      refreshRecords();
+    };
+    wrap.appendChild(b);
+  });
+  const bc = document.createElement('button');
+  bc.type = 'button';
+  bc.className = 'cat-chip custom' + (selectedCat === '__custom__' ? ' on' : '');
+  bc.textContent = '\uFF0B Custom\u2026';
+  bc.onclick = () => {
+    selectedCat = '__custom__';
+    renderCatChips(lastPerCat || perCat);
+    $('customName').style.display = 'block';
+    $('customName').focus();
+    renderChips();
+  };
+  wrap.appendChild(bc);
+}
+
+/* ---------- keyword chips ---------- */
+function renderChips() {
+  const wrap = $('kwChips');
+  wrap.innerHTML = '';
+  const suggested = (selectedCat !== '__custom__' && lastPerCat && lastPerCat[selectedCat]
+    && lastPerCat[selectedCat].suggested) || [];
+  const active = $('keywords').value.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+  suggested.forEach(kw => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'chip-kw' + (active.includes(kw.toLowerCase()) ? ' on' : '');
+    b.textContent = kw;
+    b.onclick = () => {
+      let kws = $('keywords').value.split(',').map(s => s.trim()).filter(Boolean);
+      if (kws.some(k => k.toLowerCase() === kw.toLowerCase())) {
+        kws = kws.filter(k => k.toLowerCase() !== kw.toLowerCase());
+      } else {
+        kws.push(kw);
+      }
+      $('keywords').value = kws.join(', ');
+      renderChips();
+    };
+    wrap.appendChild(b);
+  });
+}
+
+/* ---------- results: category counts + downloads ---------- */
+function renderCountChips() {
+  if (!lastPerCat) return;
+  const wrap = $('countChips');
+  wrap.innerHTML = '';
+  Object.entries(lastPerCat).forEach(([slug, c]) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'count-chip' + (slug === currentCat ? ' on' : '');
+    b.innerHTML = `<span></span><span class="num">${c.count || 0}</span>`;
+    b.querySelector('span').textContent = c.display;
+    b.onclick = () => { currentCat = slug; recPage = 1; renderCountChips(); refreshRecords(); };
+    if (c.count > 0 || c.custom) {
+      const del = document.createElement('span');
+      del.className = 'del';
+      del.textContent = '×';
+      del.title = c.custom ? 'Delete this category and its records'
+                           : 'Delete the records in this category';
+      del.onclick = e => { e.stopPropagation(); deleteCategory(slug, c); };
+      b.appendChild(del);
+    }
+    wrap.appendChild(b);
+  });
+}
+
+async function deleteCategory(slug, c) {
+  const what = c.custom
+    ? `Delete the "${c.display}" category and its ${c.count} record${c.count === 1 ? '' : 's'}?\n\nIts Excel file will be removed too. This cannot be undone.`
+    : `Delete all ${c.count} record${c.count === 1 ? '' : 's'} in "${c.display}"?\n\nThe category stays, but its records and Excel content are removed. This cannot be undone.`;
+  if (!confirm(what)) return;
+  try {
+    const res = await api('/api/category/delete', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({category: slug}),
+    });
+    toast(`Deleted ${res.removed} record${res.removed === 1 ? '' : 's'} from ${res.display}`, 'warn', 'i-x');
+    if (currentCat === slug && res.was_custom) currentCat = 'Finance';
+    catKeySet = '';           // force the category selectors to rebuild
+    if (selectedCat === slug) { selectedCat = 'Finance'; }
+    allRecords = [];
+    await poll();             // pulls the fresh category list from the server
+    refreshFiles(); refreshRecords();
+    renderCatChips(lastPerCat || {});
+  } catch (e) { toast(e.message, 'bad', 'i-x'); }
+}
+function maybeShowResults() {
+  const any = lastPerCat && Object.values(lastPerCat).some(c => c.count > 0);
+  $('resultsSec').style.display = any ? 'block' : 'none';
+}
+
+async function refreshFiles() {
+  try {
+    const data = await api('/api/files');
+    const el = $('downloads');
+    el.innerHTML = '';
+    data.files.forEach(f => {
+      const a = document.createElement('a');
+      a.className = 'btn btn-dl';
+      const url = `${API_BASE}/api/download/${encodeURIComponent(f.name)}`;
+      a.href = url;
+      a.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24"><use href="#i-download"/></svg><span></span>`;
+      a.querySelector('span').textContent = f.name.replace(/\.xlsx$/, '');
+      if (getToken()) {
+        // plain <a> downloads can't carry the auth header
+        a.onclick = async e => {
+          e.preventDefault();
+          try {
+            const r = await fetch(url, {headers: authHeaders()});
+            if (!r.ok) throw new Error('download failed');
+            const blobUrl = URL.createObjectURL(await r.blob());
+            const dl = document.createElement('a');
+            dl.href = blobUrl; dl.download = f.name;
+            dl.click();
+            URL.revokeObjectURL(blobUrl);
+          } catch (err) { toast('Download failed — check your access code', 'bad', 'i-x'); }
+        };
+      }
+      el.appendChild(a);
+    });
+  } catch (e) {}
+}
+
+/* ---------- init ---------- */
+// The page may be served by something other than the app (an editor
+// preview / "Live Server" tab, another port): relative /api calls then hit
+// a server that has no API and the page would say "Offline" forever. When
+// that happens, look for the app at its standard address and move there.
+const APP_URL = 'http://127.0.0.1:8100/';
+let redirectProbeTimer = null;
+function probeAppAndRedirect() {
+  if (IS_FILE || redirectProbeTimer || location.href.startsWith(APP_URL)) return;
+  const msg = document.getElementById('apiErrMsg');
+  msg.innerHTML = 'This page is not being served by the app (' +
+    location.host.replace(/[<>&"]/g, '') + '). Open it at ' +
+    '<a href="' + APP_URL + '" style="color:inherit;font-weight:700">' + APP_URL +
+    '</a> &mdash; switching automatically as soon as the app answers. If the ' +
+    'app is not running, double-click <code>start_app.bat</code> in the app folder.';
+  const probe = () => fetch(APP_URL + 'api/health', {mode: 'no-cors', cache: 'no-store'})
+    .then(() => location.replace(APP_URL))   // reachable: go to the real app
+    .catch(() => {});
+  probe();
+  redirectProbeTimer = setInterval(probe, 2500);
+}
+async function isOurBackend() {
+  // our backend answers /api/health with JSON {"status": "ok", ...}
+  try {
+    const r = await fetch(API_BASE + '/api/health', {cache: 'no-store'});
+    const j = await r.json();
+    return j && j.status === 'ok';
+  } catch (e) { return false; }
+}
+async function init() {
+  try {
+    cfg = await api('/api/config');
+  } catch (e) {
+    setConnected(false);
+    if (!IS_FILE && !(await isOurBackend())) probeAppAndRedirect();
+    setTimeout(init, 3000);  // retry until the backend is reachable
+    return;
+  }
+  setConnected(true);
+  creditsPerQuery = cfg.defaults.credits_per_query;
+  lastPerCat = Object.fromEntries(cfg.categories.map(c => [c.slug, c]));
+  catKeySet = Object.keys(lastPerCat).join('|');
+  renderCatChips(lastPerCat);
+  renderChips();
+  fillDatalist('countryList', COUNTRIES);
+  updateStateList();
+  const tsel = $('target');
+  tsel.innerHTML = '';
+  (cfg.defaults.target_choices || [20, 50, 100, 250, 500, 1000, 1500, 2000]).forEach(v => {
+    const o = document.createElement('option');
+    o.value = v; o.textContent = v.toLocaleString();
+    tsel.appendChild(o);
+  });
+  tsel.value = cfg.defaults.target;
+  $('maxq').value = cfg.defaults.max_queries;
+  $('keyDot').className = 'dot ' + (cfg.serper_key_present ? 'on' : 'off');
+  $('keyText').textContent = cfg.serper_key_present ? 'API key OK' : 'API key missing';
+  if (!cfg.serper_key_present) { $('keywarn').style.display = 'flex'; $('start').disabled = true; }
+  updateEstimate();
+  renderCountChips();
+  maybeShowResults();
+  // Status at the cadence the server suggests (3 s while your collection
+  // runs, 10 s otherwise, 30 s in a background tab; never overlapping). The
+  // records table is NOT re-downloaded while your collection runs - it
+  // refreshes when it ends (see poll) and, when idle, only if the shown
+  // category's count changed (the server answers 304 when nothing did).
+  pollLoop();
+  setInterval(() => {
+    const running = ACTIVE.includes(lastStatus);
+    const c = lastPerCat && lastPerCat[currentCat];
+    if (!running && c && c.count !== recordsCount[currentCat]
+        && $('resultsSec').style.display !== 'none') refreshRecords();
+  }, 15000);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) { clearTimeout(pollTimer); pollLoop(); }
+  });
+  refreshRecords(); refreshFiles();
+}
+
+function updateEstimate() {
+  const q = Math.min(+$('maxq').value || 12, 400);
+  const t = +$('target').value || 100;
+  $('estimate').textContent =
+    `Starts with ${q} searches, then automatically adds new cities and ` +
+    `service phrases until the target is reached. Credit cap: ` +
+    `${Math.min(800, Math.max(q * creditsPerQuery, t))} Serper credits.`;
+}
+// Scale the query budget with the target (unless the user set it manually)
+// so a 100-record search doesn't run out of queries at 76 records.
+let maxqManual = false;
+$('maxq').addEventListener('input', () => { maxqManual = true; updateEstimate(); });
+$('target').addEventListener('change', () => {
+  if (!maxqManual) {
+    $('maxq').value = Math.min(400, Math.max(12, Math.ceil(+$('target').value / 6)));
+  }
+  updateEstimate();
+});
+$('country').addEventListener('input', updateStateList);
+$('keywords').addEventListener('input', renderChips);
+
+/* ---------- start / stop ---------- */
+$('start').onclick = async () => {
+  const isCustom = selectedCat === '__custom__';
+  if (isCustom && $('customName').value.trim().length < 3) {
+    toast('Type a custom category name first (3+ characters)', 'warn', 'i-alert');
+    $('customName').focus();
+    return;
+  }
+  $('start').disabled = true;
+  try {
+    const job = await api('/api/collect', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        category: isCustom ? '__custom__' : selectedCat,
+        custom_category: $('customName').value,
+        keywords: $('keywords').value,
+        country: $('country').value, state: $('state').value, city: $('city').value,
+        target: +$('target').value,
+        provider: $('provider').value, max_queries: +$('maxq').value,
+      })
+    });
+    currentCat = job.category;
+    toast(job.status === 'queued'
+      ? `Queued (#${job.queue_position || 1}): ${job.category_display} starts automatically`
+      : `Search started: ${job.category_display}`, 'good', 'i-play');
+    $('progressCard').scrollIntoView({behavior: 'smooth', block: 'nearest'});
+    clearTimeout(pollTimer); pollLoop();
+  } catch (e) { toast(e.message, 'bad', 'i-x'); $('start').disabled = false; }
+};
+$('stopBtn').onclick = () => api('/api/stop', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({job_id: logJob || ''}),
+  })
+  .then(() => { toast('Stopping \u2014 everything found so far is saved', 'warn', 'i-stop');
+                clearTimeout(pollTimer); pollLoop(); })
+  .catch(e => toast(e.message, 'bad', 'i-x'));
+
+/* ---------- live poll ---------- */
+function setText(id, v) { $(id).textContent = v; }
+
+const FEED_RULES = [
+  [/^Found:/, 'found', 'i-check'], [/^Duplicate:/, 'dup', 'i-copy'],
+  [/^Rejected:/, 'reject', 'i-alert'], [/^Failed:/, 'fail', 'i-x'],
+  [/^Search provider disabled|^Job failed/, 'fail', 'i-x'],
+  [/^Recovering:|^Watchdog:|^Worker error:|^Search failed:/, 'reject', 'i-alert'],
+  [/^Recovered:|^Search strategy:|^Resumed:/, 'search', 'i-check'],
+  [/^Paused:|^Still waiting for Serper credits/, 'reject', 'i-alert'],
+  [/^Searching:/, 'search', 'i-search'], [/^Crawling/, '', 'i-globe'],
+  [/^Directory source:/, 'search', 'i-folder'],
+  [/^Target reached|^Job started/, 'found', 'i-check'],
+  [/^Queued:/, 'search', 'i-info'],
+];
+// queued | pending | running | recovering | waiting are live;
+// completed | stopped | exhausted | failed are terminal
+const ACTIVE = ['queued', 'pending', 'running', 'recovering', 'waiting'];
+const FEED_MAX = 300;
+let feedLines = [], logSeq = 0, logJob = '';
+function parseLine(line) {
+  const m = line.match(/^(\d\d:\d\d:\d\d)\s+(.*)$/s);
+  return {time: m ? m[1] : '', msg: m ? m[2] : line};
+}
+/* Live log: the server sends only lines after our cursor; rows are appended
+   (the whole feed used to be rebuilt from 300 lines on every poll). */
+function applyLog(j) {
+  const lines = j.log || [];
+  const feed = $('feed');
+  if (j.log_reset || j.id !== logJob) {
+    feedLines = lines.slice(-FEED_MAX);
+    renderFeed(feedLines, true);
+  } else if (lines.length) {
+    feedLines = feedLines.concat(lines).slice(-FEED_MAX);
+    renderFeed(lines, false);
+    while (feed.childElementCount > FEED_MAX) feed.removeChild(feed.firstElementChild);
+  }
+  logJob = j.id;
+  logSeq = j.log_seq || 0;
+}
+function renderFeed(lines, replace) {
+  const feed = $('feed');
+  const atBottom = feed.scrollTop + feed.clientHeight >= feed.scrollHeight - 40;
+  if (replace) feed.innerHTML = '';
+  lines.forEach(line => {
+    const {time, msg} = parseLine(line);
+    let cls = '', icon = 'i-info';
+    for (const [re, c, i] of FEED_RULES) if (re.test(msg)) { cls = c; icon = i; break; }
+    const row = document.createElement('div');
+    row.className = 'feed-row';
+    row.innerHTML =
+      `<div class="feed-ico ${cls}"><svg width="12" height="12" viewBox="0 0 24 24"><use href="#${icon}"/></svg></div>` +
+      `<span class="feed-time">${time}</span><span class="feed-msg"></span>`;
+    const parts = msg.split(/:(.*)/s);
+    const msgEl = row.querySelector('.feed-msg');
+    if (parts.length > 1 && parts[0].length < 24) {
+      const b = document.createElement('b');
+      b.textContent = parts[0] + ': ';
+      msgEl.appendChild(b);
+      msgEl.appendChild(document.createTextNode(parts[1].trim()));
+    } else {
+      msgEl.textContent = msg;
+    }
+    feed.appendChild(row);
+  });
+  if (atBottom) feed.scrollTop = feed.scrollHeight;
+}
+
+/* Poll cadence comes from the server (poll_ms: 3 s while your collection
+   runs, 10 s otherwise); 30 s in a background tab; exponential backoff
+   while the server is unreachable or busy. */
+let pollTimer = null, pollMs = 3000, pollFailures = 0, pollBusy = false, pollAgain = false;
+async function pollLoop() {
+  clearTimeout(pollTimer);
+  // exactly one polling chain: a call while a poll is in flight (Start,
+  // Stop, tab shown) just asks that poll to run once more when it's done
+  if (pollBusy) { pollAgain = true; return; }
+  pollBusy = true;
+  try { await poll(); } finally { pollBusy = false; }
+  clearTimeout(pollTimer);
+  if (pollAgain) { pollAgain = false; pollLoop(); return; }
+  const base = document.hidden ? Math.max(30000, pollMs) : pollMs;
+  const delay = pollFailures ? Math.min(30000, base * 2 ** Math.min(4, pollFailures)) : base;
+  pollTimer = setTimeout(pollLoop, delay * (0.9 + 0.2 * Math.random()));
+}
+function renderSlots(q, act) {
+  if (!q) return;
+  $('slotsChip').style.display = 'inline-flex';
+  $('slotsText').textContent = `${q.running}/${q.max_active} collections running` +
+    (q.queued ? ` · ${q.queued} queued` : '');
+  $('slotsChip').title = (act || []).map(a =>
+    `${a.display}: ${a.collected}/${a.target} (${a.status})`).join('\n') ||
+    'No collections running right now';
+}
+async function poll() {
+  let st;
+  const qs = logJob ? `?log_after=${logSeq}&log_job=${encodeURIComponent(logJob)}` : '';
+  try { st = await api('/api/status' + qs); pollFailures = 0; }
+  catch (e) { pollFailures++; setConnected(false); return; }
+  setConnected(true);
+  pollMs = Math.max(1000, +st.poll_ms || 3000);
+  lastPerCat = st.per_category;
+  const key = Object.keys(st.per_category).join('|');
+  if (key !== catKeySet) { catKeySet = key; renderCatChips(st.per_category); }
+  renderCountChips();
+  maybeShowResults();
+  renderSlots(st.queue, st.active_jobs);
+
+  const j = st.job;
+  if (!j) return;
+  $('progressCard').style.display = 'block';
+
+  const running = ACTIVE.includes(j.status);
+  const recovering = j.status === 'recovering';
+  const waiting = j.status === 'waiting';
+  const queued = j.status === 'queued' || j.status === 'pending';
+  $('start').disabled = running || !(cfg && cfg.serper_key_present);
+  $('stopBtn').style.display = running ? 'inline-flex' : 'none';
+  $('progIcon').classList.toggle('spin', running && !waiting && !queued);
+  $('progIcon').firstElementChild.setAttribute('href',
+    waiting ? '#i-stop' : running ? '#i-loader' : j.status === 'completed' ? '#i-check'
+            : j.status === 'failed' ? '#i-x' : '#i-stop');
+  $('progTitle').textContent = queued
+    ? (j.queue_position ? `Queued — #${j.queue_position} in line: ${j.category_display}`
+                        : `Starting: ${j.category_display}`)
+    : waiting
+    ? `Paused — out of Serper credits: ${j.category_display}`
+    : recovering
+    ? `Recovering — still collecting: ${j.category_display}`
+    : running ? `Searching: ${j.category_display}`
+    : j.status === 'completed' ? `Completed: ${j.category_display}`
+    : j.status === 'exhausted' ? `Searches exhausted: ${j.category_display}`
+    : j.status === 'stopped' ? `Stopped: ${j.category_display}`
+    : `Failed: ${j.category_display}`;
+
+  const pct = Math.min(100, Math.round(100 * j.collected / j.target));
+  $('meterFill').style.width = pct + '%';
+  $('meterFill').classList.toggle('active', running);
+  setText('pPct', pct + '%');
+  setText('pCollected', j.collected);
+  setText('pTarget', j.target);
+
+  applyLog(j);
+  if (running) {
+    setText('activityNow', feedLines.length
+      ? parseLine(feedLines[feedLines.length - 1]).msg : 'Starting\u2026');
+  } else {
+    setText('activityNow', '');
+  }
+  const sm = $('statusMsg');
+  sm.className = 'status-msg ' + (queued ? 'queued'
+    : recovering || waiting ? j.status : running ? '' : j.status);
+  if (queued) {
+    sm.textContent = j.queue_position
+      ? `Your collection is #${j.queue_position} in line. It starts automatically ` +
+        `as soon as a collection slot is free (or, if someone is already filling ` +
+        `this category, when they finish). You can leave this page open or come back later.`
+      : 'Starting your collection\u2026';
+  } else if (waiting) {
+    sm.textContent = j.recovery || 'Paused: out of Serper credits — add credits and the collection continues automatically.';
+  } else if (recovering) {
+    sm.textContent = `Recovering: ${j.recovery || 'retrying a failed step'} \u2014 ` +
+      `the collection is still running and continues automatically.`;
+  } else if (!running) {
+    sm.textContent =
+      j.status === 'completed'
+        ? `Completed \u2014 ${j.collected} of ${j.target} valid unique records. Your Excel files are ready below.`
+      : j.status === 'exhausted'
+        ? `Could only find ${j.collected} of ${j.target} genuine valid companies: ${j.stop_reason || 'every search strategy is used up'} ` +
+          `Everything found is saved.`
+      : j.status === 'stopped' ? 'Stopped. Everything found so far is saved \u2014 start again to continue.'
+      : 'The collection failed (unrecoverable): ' + (j.error || 'see the activity log') +
+        ' \u2014 anything already found is saved.';
+  }
+
+  const c = j.counters;
+  setText('s_email', c.emails); setText('s_phone', c.phones);
+  setText('s_web', c.websites); setText('s_dups', c.duplicates);
+  setText('s_queries', c.queries_executed); setText('s_fail', c.failed);
+  setText('s_credits', c.serper_credits);
+  const cr = j.credits || {};
+  setText('c_places', cr.places_credits ?? 0);
+  setText('c_organic', cr.organic_credits ?? 0);
+  setText('c_saved_q', (cr.cached_queries ?? 0) + (cr.skipped_duplicate_queries ?? 0));
+  setText('c_new', cr.new_domains ?? 0);
+  setText('c_dup', cr.duplicate_results ?? 0);
+  setText('c_vpc', cr.valid_per_credit ?? '–');
+  setText('c_cpv', cr.credits_per_valid ?? '–');
+  setText('c_saved', cr.estimated_credits_saved ?? 0);
+
+  if (lastStatus && lastStatus !== j.status) {
+    if (j.status === 'completed') { toast('Completed \u2014 Excel files updated', 'good', 'i-check'); refreshFiles(); refreshRecords(); }
+    if (j.status === 'exhausted') { toast('Searches exhausted \u2014 progress saved', 'warn', 'i-stop'); refreshFiles(); refreshRecords(); }
+    if (j.status === 'failed') toast('Collection failed: ' + (j.error || 'see details'), 'bad', 'i-x');
+    if (j.status === 'waiting') { toast('Paused — out of Serper credits; progress saved', 'warn', 'i-stop'); refreshFiles(); refreshRecords(); }
+    if (j.status === 'stopped') { toast('Search stopped \u2014 progress saved', 'warn', 'i-stop'); refreshFiles(); refreshRecords(); }
+  }
+  lastStatus = j.status;
+}
+
+/* ---------- records table ---------- */
+const REC_COLS = [
+  ['Company Name', 'Company'], ['Official Website', 'Website'],
+  ['Business Email', 'Email'], ['Business Phone', 'Phone'],
+  ['City', 'City'], ['Country', 'Country'],
+];
+function buildHead() {
+  const tr = $('recHead');
+  tr.innerHTML = '';
+  REC_COLS.forEach(([key, label]) => {
+    const th = document.createElement('th');
+    th.innerHTML = `${label} <span class="arrow">${recSort.key === key ? (recSort.dir > 0 ? '\u25B2' : '\u25BC') : ''}</span>`;
+    th.onclick = () => {
+      recSort = {key, dir: recSort.key === key ? -recSort.dir : 1};
+      renderTable();
+    };
+    tr.appendChild(th);
+  });
+}
+const recordsCount = {};   // category -> total when its table was last loaded
+async function refreshRecords() {
+  if (!currentCat || currentCat === '__custom__') return;
+  const cat = currentCat;
+  try {
+    // the browser revalidates with the ETag: unchanged tables cost a 304
+    const data = await api(`/api/records?category=${encodeURIComponent(cat)}&limit=2000`);
+    recordsCount[cat] = data.total;
+    if (cat !== currentCat) return;
+    allRecords = data.records;
+    renderTable();
+  } catch (e) {}
+}
+function renderTable() {
+  buildHead();
+  const q = $('recSearch').value.trim().toLowerCase();
+  let rows = allRecords;
+  if (q) rows = rows.filter(r => REC_COLS.some(([k]) => String(r[k] || '').toLowerCase().includes(q)));
+  const {key, dir} = recSort;
+  rows = [...rows].sort((a, b) =>
+    String(a[key] ?? '').localeCompare(String(b[key] ?? '')) * dir);
+  const pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  recPage = Math.min(Math.max(1, recPage), pages);
+  const slice = rows.slice((recPage - 1) * PAGE_SIZE, recPage * PAGE_SIZE);
+  const tb = $('recRows');
+  tb.innerHTML = '';
+  slice.forEach(r => {
+    const tr = document.createElement('tr');
+    REC_COLS.forEach(([k, label]) => {
+      const td = document.createElement('td');
+      td.dataset.label = label;
+      const v = r[k] || '';
+      if (k === 'Official Website' && /^https?:\/\//i.test(v)) {
+        const a = document.createElement('a');
+        a.href = v; a.target = '_blank'; a.rel = 'noopener noreferrer';
+        a.textContent = v.replace(/^https?:\/\//, '');
+        td.appendChild(a);
+      } else {
+        td.textContent = v; td.title = v;
+      }
+      tr.appendChild(td);
+    });
+    tb.appendChild(tr);
+  });
+  $('recEmpty').style.display = rows.length ? 'none' : 'block';
+  $('recCount').textContent =
+    `${displayNames[currentCat] || currentCat} \u2022 ${rows.length} record${rows.length === 1 ? '' : 's'}` +
+    (q ? ` (filtered from ${allRecords.length})` : '');
+  $('pageInfo').textContent = rows.length
+    ? `Showing ${(recPage - 1) * PAGE_SIZE + 1}\u2013${Math.min(recPage * PAGE_SIZE, rows.length)} of ${rows.length}`
+    : '';
+  $('prevPg').disabled = recPage <= 1;
+  $('nextPg').disabled = recPage >= pages;
+}
+$('recSearch').addEventListener('input', () => { recPage = 1; renderTable(); });
+$('prevPg').onclick = () => { recPage--; renderTable(); };
+$('nextPg').onclick = () => { recPage++; renderTable(); };
+
+init();
+</script>
+</body>
+</html>

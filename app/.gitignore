@@ -1,0 +1,6 @@
+.env
+serper_key.txt
+output/
+__pycache__/
+*.pyc
+.venv/

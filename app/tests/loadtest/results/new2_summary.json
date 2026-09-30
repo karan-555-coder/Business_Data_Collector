@@ -1,0 +1,746 @@
+[
+ {
+  "users": 100,
+  "client": "new",
+  "hold_s": 60.0,
+  "jobs": [
+   {
+    "category": "Finance",
+    "start_status": 200,
+    "detail": "",
+    "final_status": "running",
+    "collected_first": 280,
+    "collected_last": 774,
+    "records_per_min": 388.0
+   },
+   {
+    "category": "Other_B2B",
+    "start_status": 200,
+    "detail": "",
+    "final_status": "running",
+    "collected_first": 624,
+    "collected_last": 900,
+    "records_per_min": 229.0
+   },
+   {
+    "category": "RPO",
+    "start_status": 200,
+    "detail": "",
+    "final_status": "running",
+    "collected_first": 20,
+    "collected_last": 268,
+    "records_per_min": 213.2
+   },
+   {
+    "category": "Advisory",
+    "start_status": 200,
+    "detail": "",
+    "final_status": "running",
+    "collected_first": 100,
+    "collected_last": 319,
+    "records_per_min": 200.9
+   },
+   {
+    "category": "__custom__:Load Test Niche 6",
+    "start_status": 200,
+    "detail": "",
+    "final_status": "queued",
+    "collected_first": 0,
+    "collected_last": 0,
+    "records_per_min": 0.0
+   },
+   {
+    "category": "CDS_Corporate_Compliance",
+    "start_status": 200,
+    "detail": "",
+    "final_status": "queued",
+    "collected_first": 500,
+    "collected_last": 500,
+    "records_per_min": 0.0
+   },
+   {
+    "category": "Law_Firms",
+    "start_status": 200,
+    "detail": "",
+    "final_status": "queued",
+    "collected_first": 20,
+    "collected_last": 20,
+    "records_per_min": 0.0
+   },
+   {
+    "category": "__custom__:Load Test Niche 7",
+    "start_status": 200,
+    "detail": "",
+    "final_status": "queued",
+    "collected_first": 0,
+    "collected_last": 0,
+    "records_per_min": 0.0
+   }
+  ],
+  "endpoints": {
+   "collect": {
+    "n": 1,
+    "rps": 0.0,
+    "p50": 2.3,
+    "p95": 2.3,
+    "p99": 2.3,
+    "max": 2.3,
+    "kb_avg": 2.5,
+    "errors": 0,
+    "throttled_429": 0,
+    "codes": {
+     "200": 8
+    }
+   },
+   "config": {
+    "n": 0,
+    "rps": 0.0,
+    "p50": 0.0,
+    "p95": 0.0,
+    "p99": 0.0,
+    "max": 0,
+    "kb_avg": 0.0,
+    "errors": 0,
+    "throttled_429": 0,
+    "codes": {
+     "200": 100
+    }
+   },
+   "files": {
+    "n": 0,
+    "rps": 0.0,
+    "p50": 0.0,
+    "p95": 0.0,
+    "p99": 0.0,
+    "max": 0,
+    "kb_avg": 0.0,
+    "errors": 0,
+    "throttled_429": 0,
+    "codes": {
+     "200": 100
+    }
+   },
+   "page": {
+    "n": 0,
+    "rps": 0.0,
+    "p50": 0.0,
+    "p95": 0.0,
+    "p99": 0.0,
+    "max": 0,
+    "kb_avg": 0.0,
+    "errors": 0,
+    "throttled_429": 0,
+    "codes": {
+     "200": 100
+    }
+   },
+   "records": {
+    "n": 152,
+    "rps": 2.5,
+    "p50": 1.2,
+    "p95": 18.3,
+    "p99": 22.4,
+    "max": 25.9,
+    "kb_avg": 28.5,
+    "errors": 0,
+    "throttled_429": 0,
+    "codes": {
+     "200": 202,
+     "304": 76
+    }
+   },
+   "status": {
+    "n": 1992,
+    "rps": 33.2,
+    "p50": 1.0,
+    "p95": 2.7,
+    "p99": 4.1,
+    "max": 10.7,
+    "kb_avg": 3.9,
+    "errors": 0,
+    "throttled_429": 0,
+    "codes": {
+     "200": 2474
+    }
+   }
+  },
+  "total_requests": 3060,
+  "total_errors": 0,
+  "error_rate": 0.0,
+  "throughput_rps": 35.8,
+  "health_probe": {
+   "n": 237,
+   "p50": 0.9,
+   "p95": 2.2,
+   "p99": 3.3,
+   "max": 6.2
+  },
+  "server": {
+   "cpu_pct_avg": 32.4,
+   "cpu_pct_max": 131.8,
+   "rss_mb_max": 527.0,
+   "rss_mb_end": 526.7,
+   "threads_max": 283,
+   "processes": 10
+  },
+  "cpu_note": "cpu_pct = % of ONE core summed over the server process and its children; machine has 12 logical cores"
+ },
+ {
+  "users": 500,
+  "client": "new",
+  "hold_s": 60.0,
+  "jobs": [
+   {
+    "category": "Finance",
+    "start_status": 200,
+    "detail": "",
+    "final_status": "running",
+    "collected_first": 280,
+    "collected_last": 730,
+    "records_per_min": 359.0
+   },
+   {
+    "category": "__custom__:Load Test Niche 6",
+    "start_status": 200,
+    "detail": "",
+    "final_status": "queued",
+    "collected_first": 0,
+    "collected_last": 0,
+    "records_per_min": 0.0
+   },
+   {
+    "category": "Law_Firms",
+    "start_status": 200,
+    "detail": "",
+    "final_status": "queued",
+    "collected_first": 20,
+    "collected_last": 20,
+    "records_per_min": 0.0
+   },
+   {
+    "category": "RPO",
+    "start_status": 200,
+    "detail": "",
+    "final_status": "running",
+    "collected_first": 20,
+    "collected_last": 290,
+    "records_per_min": 225.6
+   },
+   {
+    "category": "__custom__:Load Test Niche 7",
+    "start_status": 200,
+    "detail": "",
+    "final_status": "queued",
+    "collected_first": 0,
+    "collected_last": 0,
+    "records_per_min": 0.0
+   },
+   {
+    "category": "Other_B2B",
+    "start_status": 200,
+    "detail": "",
+    "final_status": "queued",
+    "collected_first": 624,
+    "collected_last": 624,
+    "records_per_min": 0.0
+   },
+   {
+    "category": "CDS_Corporate_Compliance",
+    "start_status": 200,
+    "detail": "",
+    "final_status": "running",
+    "collected_first": 500,
+    "collected_last": 785,
+    "records_per_min": 236.8
+   },
+   {
+    "category": "Advisory",
+    "start_status": 200,
+    "detail": "",
+    "final_status": "running",
+    "collected_first": 100,
+    "collected_last": 305,
+    "records_per_min": 192.8
+   }
+  ],
+  "endpoints": {
+   "collect": {
+    "n": 1,
+    "rps": 0.0,
+    "p50": 2.8,
+    "p95": 2.8,
+    "p99": 2.8,
+    "max": 2.8,
+    "kb_avg": 2.5,
+    "errors": 0,
+    "throttled_429": 0,
+    "codes": {
+     "200": 8
+    }
+   },
+   "config": {
+    "n": 0,
+    "rps": 0.0,
+    "p50": 0.0,
+    "p95": 0.0,
+    "p99": 0.0,
+    "max": 0,
+    "kb_avg": 0.0,
+    "errors": 0,
+    "throttled_429": 0,
+    "codes": {
+     "200": 500
+    }
+   },
+   "files": {
+    "n": 0,
+    "rps": 0.0,
+    "p50": 0.0,
+    "p95": 0.0,
+    "p99": 0.0,
+    "max": 0,
+    "kb_avg": 0.0,
+    "errors": 0,
+    "throttled_429": 0,
+    "codes": {
+     "200": 500
+    }
+   },
+   "page": {
+    "n": 0,
+    "rps": 0.0,
+    "p50": 0.0,
+    "p95": 0.0,
+    "p99": 0.0,
+    "max": 0,
+    "kb_avg": 0.0,
+    "errors": 0,
+    "throttled_429": 0,
+    "codes": {
+     "200": 500
+    }
+   },
+   "records": {
+    "n": 1031,
+    "rps": 17.2,
+    "p50": 0.7,
+    "p95": 15.3,
+    "p99": 26.0,
+    "max": 35.9,
+    "kb_avg": 41.9,
+    "errors": 0,
+    "throttled_429": 0,
+    "codes": {
+     "200": 1342,
+     "304": 317
+    }
+   },
+   "status": {
+    "n": 9987,
+    "rps": 166.4,
+    "p50": 1.3,
+    "p95": 3.8,
+    "p99": 5.4,
+    "max": 24.4,
+    "kb_avg": 3.7,
+    "errors": 0,
+    "throttled_429": 0,
+    "codes": {
+     "200": 12349
+    }
+   }
+  },
+  "total_requests": 15516,
+  "total_errors": 0,
+  "error_rate": 0.0,
+  "throughput_rps": 183.7,
+  "health_probe": {
+   "n": 239,
+   "p50": 1.3,
+   "p95": 3.7,
+   "p99": 4.4,
+   "max": 4.7
+  },
+  "server": {
+   "cpu_pct_avg": 36.6,
+   "cpu_pct_max": 133.5,
+   "rss_mb_max": 553.4,
+   "rss_mb_end": 552.9,
+   "threads_max": 284,
+   "processes": 10
+  },
+  "cpu_note": "cpu_pct = % of ONE core summed over the server process and its children; machine has 12 logical cores"
+ },
+ {
+  "users": 1000,
+  "client": "new",
+  "hold_s": 60.0,
+  "jobs": [
+   {
+    "category": "CDS_Corporate_Compliance",
+    "start_status": 200,
+    "detail": "",
+    "final_status": "running",
+    "collected_first": 500,
+    "collected_last": 823,
+    "records_per_min": 263.3
+   },
+   {
+    "category": "Law_Firms",
+    "start_status": 200,
+    "detail": "",
+    "final_status": "running",
+    "collected_first": 20,
+    "collected_last": 273,
+    "records_per_min": 211.7
+   },
+   {
+    "category": "RPO",
+    "start_status": 200,
+    "detail": "",
+    "final_status": "queued",
+    "collected_first": 20,
+    "collected_last": 20,
+    "records_per_min": 0.0
+   },
+   {
+    "category": "__custom__:Load Test Niche 6",
+    "start_status": 200,
+    "detail": "",
+    "final_status": "queued",
+    "collected_first": 0,
+    "collected_last": 0,
+    "records_per_min": 0.0
+   },
+   {
+    "category": "Advisory",
+    "start_status": 200,
+    "detail": "",
+    "final_status": "queued",
+    "collected_first": 100,
+    "collected_last": 100,
+    "records_per_min": 0.0
+   },
+   {
+    "category": "__custom__:Load Test Niche 7",
+    "start_status": 200,
+    "detail": "",
+    "final_status": "queued",
+    "collected_first": 0,
+    "collected_last": 0,
+    "records_per_min": 0.0
+   },
+   {
+    "category": "Finance",
+    "start_status": 200,
+    "detail": "",
+    "final_status": "running",
+    "collected_first": 280,
+    "collected_last": 565,
+    "records_per_min": 235.5
+   },
+   {
+    "category": "Other_B2B",
+    "start_status": 200,
+    "detail": "",
+    "final_status": "running",
+    "collected_first": 624,
+    "collected_last": 885,
+    "records_per_min": 227.3
+   }
+  ],
+  "endpoints": {
+   "collect": {
+    "n": 0,
+    "rps": 0.0,
+    "p50": 0.0,
+    "p95": 0.0,
+    "p99": 0.0,
+    "max": 0,
+    "kb_avg": 0.0,
+    "errors": 0,
+    "throttled_429": 0,
+    "codes": {
+     "200": 8
+    }
+   },
+   "config": {
+    "n": 0,
+    "rps": 0.0,
+    "p50": 0.0,
+    "p95": 0.0,
+    "p99": 0.0,
+    "max": 0,
+    "kb_avg": 0.0,
+    "errors": 0,
+    "throttled_429": 0,
+    "codes": {
+     "200": 1000
+    }
+   },
+   "files": {
+    "n": 0,
+    "rps": 0.0,
+    "p50": 0.0,
+    "p95": 0.0,
+    "p99": 0.0,
+    "max": 0,
+    "kb_avg": 0.0,
+    "errors": 0,
+    "throttled_429": 0,
+    "codes": {
+     "200": 1000
+    }
+   },
+   "page": {
+    "n": 0,
+    "rps": 0.0,
+    "p50": 0.0,
+    "p95": 0.0,
+    "p99": 0.0,
+    "max": 0,
+    "kb_avg": 0.0,
+    "errors": 0,
+    "throttled_429": 0,
+    "codes": {
+     "200": 1000
+    }
+   },
+   "records": {
+    "n": 1892,
+    "rps": 31.5,
+    "p50": 0.7,
+    "p95": 18.3,
+    "p99": 25.6,
+    "max": 65.8,
+    "kb_avg": 55.8,
+    "errors": 0,
+    "throttled_429": 0,
+    "codes": {
+     "200": 2422,
+     "304": 676
+    }
+   },
+   "status": {
+    "n": 20001,
+    "rps": 333.4,
+    "p50": 1.7,
+    "p95": 4.7,
+    "p99": 8.5,
+    "max": 23.2,
+    "kb_avg": 3.7,
+    "errors": 0,
+    "throttled_429": 0,
+    "codes": {
+     "200": 24573
+    }
+   }
+  },
+  "total_requests": 30679,
+  "total_errors": 0,
+  "error_rate": 0.0,
+  "throughput_rps": 364.9,
+  "health_probe": {
+   "n": 237,
+   "p50": 1.6,
+   "p95": 4.9,
+   "p99": 6.8,
+   "max": 9.8
+  },
+  "server": {
+   "cpu_pct_avg": 43.1,
+   "cpu_pct_max": 118.4,
+   "rss_mb_max": 592.8,
+   "rss_mb_end": 591.9,
+   "threads_max": 276,
+   "processes": 10
+  },
+  "cpu_note": "cpu_pct = % of ONE core summed over the server process and its children; machine has 12 logical cores"
+ },
+ {
+  "users": 2000,
+  "client": "new",
+  "hold_s": 60.0,
+  "jobs": [
+   {
+    "category": "Law_Firms",
+    "start_status": 200,
+    "detail": "",
+    "final_status": "queued",
+    "collected_first": 20,
+    "collected_last": 20,
+    "records_per_min": 0.0
+   },
+   {
+    "category": "RPO",
+    "start_status": 200,
+    "detail": "",
+    "final_status": "running",
+    "collected_first": 20,
+    "collected_last": 233,
+    "records_per_min": 195.1
+   },
+   {
+    "category": "Advisory",
+    "start_status": 200,
+    "detail": "",
+    "final_status": "queued",
+    "collected_first": 100,
+    "collected_last": 100,
+    "records_per_min": 0.0
+   },
+   {
+    "category": "Finance",
+    "start_status": 200,
+    "detail": "",
+    "final_status": "running",
+    "collected_first": 280,
+    "collected_last": 526,
+    "records_per_min": 213.6
+   },
+   {
+    "category": "Other_B2B",
+    "start_status": 200,
+    "detail": "",
+    "final_status": "queued",
+    "collected_first": 624,
+    "collected_last": 624,
+    "records_per_min": 0.0
+   },
+   {
+    "category": "CDS_Corporate_Compliance",
+    "start_status": 200,
+    "detail": "",
+    "final_status": "running",
+    "collected_first": 500,
+    "collected_last": 820,
+    "records_per_min": 274.3
+   },
+   {
+    "category": "__custom__:Load Test Niche 6",
+    "start_status": 200,
+    "detail": "",
+    "final_status": "queued",
+    "collected_first": 0,
+    "collected_last": 0,
+    "records_per_min": 0.0
+   },
+   {
+    "category": "__custom__:Load Test Niche 7",
+    "start_status": 200,
+    "detail": "",
+    "final_status": "running",
+    "collected_first": 0,
+    "collected_last": 374,
+    "records_per_min": 305.3
+   }
+  ],
+  "endpoints": {
+   "collect": {
+    "n": 0,
+    "rps": 0.0,
+    "p50": 0.0,
+    "p95": 0.0,
+    "p99": 0.0,
+    "max": 0,
+    "kb_avg": 0.0,
+    "errors": 0,
+    "throttled_429": 0,
+    "codes": {
+     "200": 8
+    }
+   },
+   "config": {
+    "n": 0,
+    "rps": 0.0,
+    "p50": 0.0,
+    "p95": 0.0,
+    "p99": 0.0,
+    "max": 0,
+    "kb_avg": 0.0,
+    "errors": 0,
+    "throttled_429": 0,
+    "codes": {
+     "200": 2000
+    }
+   },
+   "files": {
+    "n": 0,
+    "rps": 0.0,
+    "p50": 0.0,
+    "p95": 0.0,
+    "p99": 0.0,
+    "max": 0,
+    "kb_avg": 0.0,
+    "errors": 0,
+    "throttled_429": 0,
+    "codes": {
+     "200": 2000
+    }
+   },
+   "page": {
+    "n": 0,
+    "rps": 0.0,
+    "p50": 0.0,
+    "p95": 0.0,
+    "p99": 0.0,
+    "max": 0,
+    "kb_avg": 0.0,
+    "errors": 0,
+    "throttled_429": 0,
+    "codes": {
+     "200": 2000
+    }
+   },
+   "records": {
+    "n": 3300,
+    "rps": 55.0,
+    "p50": 0.9,
+    "p95": 8.5,
+    "p99": 20.9,
+    "max": 55.4,
+    "kb_avg": 38.0,
+    "errors": 0,
+    "throttled_429": 0,
+    "codes": {
+     "200": 4030,
+     "304": 1742
+    }
+   },
+   "status": {
+    "n": 39940,
+    "rps": 665.7,
+    "p50": 2.5,
+    "p95": 6.4,
+    "p99": 11.9,
+    "max": 26.4,
+    "kb_avg": 3.7,
+    "errors": 0,
+    "throttled_429": 0,
+    "codes": {
+     "200": 49299
+    }
+   }
+  },
+  "total_requests": 61079,
+  "total_errors": 0,
+  "error_rate": 0.0,
+  "throughput_rps": 720.7,
+  "health_probe": {
+   "n": 238,
+   "p50": 2.4,
+   "p95": 6.5,
+   "p99": 11.0,
+   "max": 18.6
+  },
+  "server": {
+   "cpu_pct_avg": 47.3,
+   "cpu_pct_max": 118.5,
+   "rss_mb_max": 663.2,
+   "rss_mb_end": 661.8,
+   "threads_max": 281,
+   "processes": 10
+  },
+  "cpu_note": "cpu_pct = % of ONE core summed over the server process and its children; machine has 12 logical cores"
+ }
+]
