@@ -756,39 +756,117 @@ async function deleteCategory(slug, c) {
 }
 function maybeShowResults() {
   const any = lastPerCat && Object.values(lastPerCat).some(c => c.count > 0);
-  $('resultsSec').style.display = any ? 'block' : 'none';
+  $('resultsSec').style.display = (any || savedFileCount > 0) ? 'block' : 'none';
 }
 
-async function refreshFiles() {
+/* ---------- saved Excel copies ----------
+   A hosted server can lose its files (free hosting wipes the disk when the
+   server sleeps, restarts or redeploys). Every Excel file the server
+   produces is therefore also kept in this browser (IndexedDB), so its
+   download button keeps working afterwards. Nothing leaves the browser. */
+const MAX_SAVED_BYTES = 25 * 1024 * 1024;
+let savedFileCount = 0;
+let fileDbPromise = null;
+function fileDb() {
+  if (!fileDbPromise) {
+    fileDbPromise = new Promise((resolve, reject) => {
+      const req = indexedDB.open('bdc_files', 1);
+      req.onupgradeneeded = () => req.result.createObjectStore('files', {keyPath: 'name'});
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    }).catch(() => null);   // storage blocked (private mode): work without it
+  }
+  return fileDbPromise;
+}
+async function savedFiles() {
   try {
-    const data = await api('/api/files');
-    const el = $('downloads');
-    el.innerHTML = '';
-    data.files.forEach(f => {
-      const a = document.createElement('a');
-      a.className = 'btn btn-dl';
-      const url = `${API_BASE}/api/download/${encodeURIComponent(f.name)}`;
-      a.href = url;
-      a.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24"><use href="#i-download"/></svg><span></span>`;
-      a.querySelector('span').textContent = f.name.replace(/\.xlsx$/, '');
-      if (getToken()) {
-        // plain <a> downloads can't carry the auth header
-        a.onclick = async e => {
-          e.preventDefault();
-          try {
-            const r = await fetch(url, {headers: authHeaders()});
-            if (!r.ok) throw new Error('download failed');
-            const blobUrl = URL.createObjectURL(await r.blob());
-            const dl = document.createElement('a');
-            dl.href = blobUrl; dl.download = f.name;
-            dl.click();
-            URL.revokeObjectURL(blobUrl);
-          } catch (err) { toast('Download failed — check your access code', 'bad', 'i-x'); }
-        };
-      }
-      el.appendChild(a);
+    const db = await fileDb();
+    if (!db) return [];
+    return await new Promise((resolve, reject) => {
+      const req = db.transaction('files').objectStore('files').getAll();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => reject(req.error);
+    });
+  } catch (e) { return []; }
+}
+async function saveFile(rec) {
+  try {
+    const db = await fileDb();
+    if (!db) return;
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction('files', 'readwrite');
+      tx.objectStore('files').put(rec);
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
     });
   } catch (e) {}
+}
+function saveBlobAs(blob, name) {
+  const blobUrl = URL.createObjectURL(blob);
+  const dl = document.createElement('a');
+  dl.href = blobUrl; dl.download = name;
+  document.body.appendChild(dl);
+  dl.click();
+  dl.remove();
+  setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+}
+async function fetchFile(name) {
+  const r = await fetch(`${API_BASE}/api/download/${encodeURIComponent(name)}`,
+                        {headers: authHeaders(), cache: 'no-store'});
+  if (!r.ok) throw new Error('download failed');
+  return r.blob();
+}
+function downloadButton(name, onClick, note) {
+  const a = document.createElement('a');
+  a.className = 'btn btn-dl';
+  a.href = '#';
+  a.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24"><use href="#i-download"/></svg><span></span>`;
+  a.querySelector('span').textContent = name.replace(/\.xlsx$/, '') + (note ? ` (${note})` : '');
+  if (note) a.title = 'Saved in this browser - the server no longer has this file';
+  a.onclick = e => { e.preventDefault(); onClick(); };
+  return a;
+}
+
+let filesBusy = false;
+async function refreshFiles() {
+  if (filesBusy) return;
+  filesBusy = true;
+  try {
+    let server = null;
+    try { server = (await api('/api/files')).files; } catch (e) {}
+    const saved = new Map((await savedFiles()).map(r => [r.name, r]));
+    // Keep a browser copy of every new or changed server file.
+    for (const f of server || []) {
+      const s = saved.get(f.name);
+      if (f.size > MAX_SAVED_BYTES || (s && s.size === f.size && s.modified === f.modified)) continue;
+      try {
+        const blob = await fetchFile(f.name);
+        const rec = {name: f.name, size: f.size, modified: f.modified, blob, savedAt: Date.now()};
+        await saveFile(rec);
+        saved.set(f.name, rec);
+      } catch (e) {}
+    }
+    const onServer = new Set((server || []).map(f => f.name));
+    const names = [...new Set([...(server || []).map(f => f.name), ...saved.keys()])].sort();
+    const el = $('downloads');
+    el.innerHTML = '';
+    names.forEach(name => {
+      const copy = saved.get(name);
+      el.appendChild(downloadButton(name, async () => {
+        try {
+          // The server's file is the newest; the browser copy is the fallback.
+          saveBlobAs(onServer.has(name) ? await fetchFile(name) : copy.blob, name);
+        } catch (err) {
+          if (copy) saveBlobAs(copy.blob, name);
+          else toast('Download failed — check your access code', 'bad', 'i-x');
+        }
+      }, onServer.has(name) ? '' : 'saved copy'));
+    });
+    savedFileCount = saved.size;
+    maybeShowResults();
+  } finally {
+    filesBusy = false;
+  }
 }
 
 /* ---------- init ---------- */
@@ -1153,6 +1231,9 @@ async function poll() {
     if (j.status === 'failed') toast('Collection failed: ' + (j.error || 'see details'), 'bad', 'i-x');
     if (j.status === 'waiting') { toast('Paused — out of Serper credits; progress saved', 'warn', 'i-stop'); refreshFiles(); refreshRecords(); }
     if (j.status === 'stopped') { toast('Search stopped \u2014 progress saved', 'warn', 'i-stop'); refreshFiles(); refreshRecords(); }
+    // Once more after the final Excel write (the file list is cached ~2 s),
+    // so the browser keeps the finished file, not a mid-run one.
+    if (!ACTIVE.includes(j.status)) setTimeout(refreshFiles, 5000);
   }
   lastStatus = j.status;
 }
