@@ -1,7 +1,8 @@
 """Off-GIL page analysis.
 
-Parsing HTML into a BeautifulSoup tree and running extraction is pure-Python
-CPU work (~170 ms per real page). Done inside crawl threads it serialises on
+Parsing HTML (dom.py, lxml) and running extraction is CPU work (~30 ms per
+real page; ~200 ms with the former BeautifulSoup tree). Done inside crawl
+threads it serialises on
 the GIL: with 32 threads the measured wall time per parse was 3.8 s. Here the
 fetched bytes are handed to a process pool, so parsing runs on real cores
 while the crawl threads only wait on network I/O.
@@ -19,10 +20,9 @@ import time
 from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
 
-from bs4 import BeautifulSoup
-
 from .. import config
-from .crawler import BS_PARSER, external_links, find_contact_links
+from . import dom
+from .crawler import external_links, find_contact_links
 from .extractor import extract_company
 from .normalize import clean_text
 from .validator import BLOCK_TITLE_RE, is_skip_domain
@@ -43,23 +43,23 @@ def analyze_html(raw: bytes, url: str, extract: bool, contact_links: bool,
     """Parse one page and return plain data (picklable). Runs in a worker
     process. Downloaded content is only parsed, never executed."""
     t0 = time.perf_counter()
-    soup = BeautifulSoup(raw, BS_PARSER)
+    doc = dom.parse(raw)
     t_parse = time.perf_counter() - t0
-    title = clean_text(soup.title.get_text()) if soup.title else ""
+    title = clean_text(dom.title(doc) or "")
     out = {"title": title, "parse_s": t_parse, "extract_s": 0.0}
     if mine:
-        out["external_links"] = external_links(soup, url, is_skip_domain, cap=mine_cap)
+        out["external_links"] = external_links(doc, url, is_skip_domain, cap=mine_cap)
     if BLOCK_TITLE_RE.search(title):
         out["blocked"] = True
         return out
     if extract:
         t1 = time.perf_counter()
-        ex = extract_company(soup, raw.decode("utf-8", "replace"), url)
+        ex = extract_company(doc, raw.decode("utf-8", "replace"), url)
         out.update(name=ex.name, email=ex.email, phone=ex.phone,
                    address=ex.address, services=ex.services)
         out["extract_s"] = time.perf_counter() - t1
     if contact_links:
-        out["contact_links"] = find_contact_links(soup, url)[:3]
+        out["contact_links"] = find_contact_links(doc, url)[:3]
     return out
 
 

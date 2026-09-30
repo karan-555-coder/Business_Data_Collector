@@ -9,7 +9,7 @@ import json
 import re
 from urllib.parse import unquote
 
-from bs4 import BeautifulSoup
+from . import dom
 
 from .normalize import clean_text, norm_domain
 
@@ -18,6 +18,30 @@ MAX_SCAN_CHARS = 200_000
 EMAIL_RE = re.compile(
     r"[A-Za-z0-9._%+\-]{1,64}@[A-Za-z0-9\-]{1,63}(?:\.[A-Za-z0-9\-]{1,63}){0,4}\.[A-Za-z]{2,12}"
 )
+# Longest possible match after the "@": label + 4 x ".label" + "." + TLD.
+_EMAIL_TAIL = 63 + 4 * 64 + 1 + 12
+
+
+def find_emails(s: str) -> list[str]:
+    """EMAIL_RE.findall(s), without its worst case: on long runs of letters
+    the plain scan retries the 64-character local part at every position.
+    The local part cannot contain "@", so every match starts within 64
+    characters before one - only those windows are searched."""
+    out: list[str] = []
+    cur, n = 0, len(s)
+    while cur < n:
+        at = s.find("@", cur)
+        if at < 0:
+            break
+        m = EMAIL_RE.search(s, max(cur, at - 64), at + 1 + _EMAIL_TAIL)
+        if m and m.start() < at:          # a match that uses this "@"
+            out.append(m.group())
+            cur = m.end()
+        else:
+            cur = at + 1
+    return out
+
+
 BAD_EMAIL_PARTS = (
     "example.", "sentry", "wixpress", "domain.com", "email.com", "yourdomain",
     "@2x", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", "schema.org",
@@ -91,12 +115,13 @@ class Extracted:
             self.name = other.name
 
 
-def meta_content(soup: BeautifulSoup, *names: str) -> str:
+def meta_content(doc, *names: str) -> str:
     for name in names:
-        tag = soup.find("meta", attrs={"property": name}) or soup.find(
-            "meta", attrs={"name": name})
-        if tag and tag.get("content"):
-            return clean_text(tag["content"])
+        tag = dom.meta(doc, prop=name)
+        if tag is None:
+            tag = dom.meta(doc, name=name)
+        if tag is not None and tag.get("content"):
+            return clean_text(tag.get("content"))
     return ""
 
 
@@ -130,10 +155,15 @@ def _format_ld_address(addr) -> str:
     return ""
 
 
-def parse_json_ld(soup: BeautifulSoup) -> dict:
+LD_JSON_RE = re.compile(r"ld\+json", re.I)
+
+
+def parse_json_ld(doc) -> dict:
     out: dict = {}
-    for script in soup.find_all("script", type=re.compile(r"ld\+json", re.I)):
-        raw = script.string or script.get_text() or ""
+    for script in dom.scripts_with_type(doc):
+        if not LD_JSON_RE.search(script.get("type") or ""):
+            continue
+        raw = script.text or ""
         try:
             data = json.loads(raw.strip())
         except Exception:
@@ -177,13 +207,13 @@ def clean_title(title: str) -> str:
     return cands[0][:120]
 
 
-def extract_emails(soup: BeautifulSoup, text: str, raw_html: str) -> list[str]:
+def extract_emails(doc, text: str, raw_html: str) -> list[str]:
     found: list[str] = []
-    for a in soup.select('a[href^="mailto:"]'):
-        addr = unquote(a.get("href", "")[7:].split("?")[0])
+    for href in dom.hrefs_starting(doc, "mailto:"):
+        addr = unquote(href[7:].split("?")[0])
         found.extend(EMAIL_RE.findall(addr[:500]))
-    found.extend(EMAIL_RE.findall(text[:MAX_SCAN_CHARS]))
-    found.extend(EMAIL_RE.findall(raw_html[:MAX_SCAN_CHARS]))
+    found.extend(find_emails(text[:MAX_SCAN_CHARS]))
+    found.extend(find_emails(raw_html[:MAX_SCAN_CHARS]))
     out: list[str] = []
     for e in found:
         e = e.strip(".-_").lower()
@@ -210,7 +240,7 @@ def _valid_phone(cand: str) -> str:
     return cand
 
 
-def extract_phones(soup: BeautifulSoup, text: str) -> list[str]:
+def extract_phones(doc, text: str) -> list[str]:
     scored: list[tuple[int, str]] = []
     seen: set[str] = set()
 
@@ -224,8 +254,8 @@ def extract_phones(soup: BeautifulSoup, text: str) -> list[str]:
         seen.add(key)
         scored.append((score, v))
 
-    for a in soup.select('a[href^="tel:"]'):
-        push(unquote(a.get("href", "")[4:]).replace("-", " ").strip(), 10)
+    for href in dom.hrefs_starting(doc, "tel:"):
+        push(unquote(href[4:]).replace("-", " ").strip(), 10)
     text = text[:MAX_SCAN_CHARS]
     for m in PHONE_RE.finditer(text):
         ctx = text[max(0, m.start() - 30):m.start()]
@@ -241,20 +271,20 @@ def extract_phones(soup: BeautifulSoup, text: str) -> list[str]:
     return [v for _, v in scored[:2]]
 
 
-def extract_address(soup: BeautifulSoup, text: str) -> str:
+def extract_address(doc, text: str) -> str:
     def ok(t: str) -> bool:
         return 10 <= len(t) <= 250 and any(ch.isdigit() for ch in t)
 
-    for tag in soup.find_all("address"):
-        t = clean_text(tag.get_text(" "))
+    for tag in dom.address_tags(doc):
+        t = clean_text(dom.text(tag, " "))
         if 10 <= len(t) <= 250:
             return t
-    for el in soup.find_all(attrs={"itemprop": "address"}):
-        t = clean_text(el.get_text(" "))
+    for el in dom.with_itemprop(doc, "address"):
+        t = clean_text(dom.text(el, " "))
         if ok(t):
             return t
-    for el in soup.find_all(class_=ADDR_CLASS_RE)[:20] + soup.find_all(id=ADDR_CLASS_RE)[:10]:
-        t = clean_text(el.get_text(" "))
+    for el in dom.with_class_or_id(doc, ADDR_CLASS_RE, 20, 10):
+        t = clean_text(dom.text(el, " "))
         if ok(t) and "@" not in t and ADDR_WORD_RE.search(t):
             return t
     for line in text.splitlines():
@@ -264,20 +294,20 @@ def extract_address(soup: BeautifulSoup, text: str) -> str:
     return ""
 
 
-def build_services(soup: BeautifulSoup, ld_desc: str) -> str:
-    desc = clean_text(ld_desc or meta_content(soup, "description", "og:description"))[:220]
+def build_services(doc, ld_desc: str) -> str:
+    desc = clean_text(ld_desc or meta_content(doc, "description", "og:description"))[:220]
     items: list[str] = []
-    for a in soup.find_all("a", href=True):
-        href = a["href"].lower()
-        txt = clean_text(a.get_text(" "))
+    for a in dom.anchors(doc):
+        href = a.get("href").lower()
+        txt = clean_text(dom.text(a, " "))
         if 3 <= len(txt) <= 45 and SERVICE_HREF_RE.search(href) and txt.lower() not in GENERIC_LINK_TEXT:
             if txt not in items:
                 items.append(txt)
         if len(items) >= 10:
             break
     if len(items) < 3:
-        for h in soup.find_all(["h2", "h3"]):
-            txt = clean_text(h.get_text(" "))
+        for h in dom.h2_h3(doc):
+            txt = clean_text(dom.text(h, " "))
             if 3 <= len(txt) <= 60 and txt.lower() not in GENERIC_LINK_TEXT and txt not in items:
                 items.append(txt)
             if len(items) >= 8:
@@ -290,25 +320,26 @@ def build_services(soup: BeautifulSoup, ld_desc: str) -> str:
     return " | ".join(parts)[:500]
 
 
-def extract_company(soup: BeautifulSoup, raw_html: str, url: str) -> Extracted:
+def extract_company(doc, raw_html: str, url: str) -> Extracted:
+    """doc: a page parsed by dom.parse()."""
     ex = Extracted()
-    ld = parse_json_ld(soup)
-    title = soup.title.get_text() if soup.title else ""
+    ld = parse_json_ld(doc)
+    title = dom.title(doc) or ""
     ex.name = (
-        ld.get("name") or meta_content(soup, "og:site_name") or ld.get("site_name")
+        ld.get("name") or meta_content(doc, "og:site_name") or ld.get("site_name")
         or clean_title(title) or norm_domain(url)
     )[:150]
-    text = soup.get_text("\n")[:MAX_SCAN_CHARS]
-    ex.email = extract_emails(soup, text, raw_html)
+    text = dom.text(doc, "\n")[:MAX_SCAN_CHARS]
+    ex.email = extract_emails(doc, text, raw_html)
     if ld.get("email") and ld["email"] not in ex.email:
         ex.email.insert(0, ld["email"])
-    ex.phone = extract_phones(soup, text)
+    ex.phone = extract_phones(doc, text)
     if ld.get("phone"):
         v = _valid_phone(ld["phone"])
         if v and v not in ex.phone:
             ex.phone.insert(0, v)
-    ex.address = ld.get("address") or extract_address(soup, text)
-    ex.services = build_services(soup, ld.get("description", ""))
+    ex.address = ld.get("address") or extract_address(doc, text)
+    ex.services = build_services(doc, ld.get("description", ""))
     return ex
 
 

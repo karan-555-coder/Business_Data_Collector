@@ -13,11 +13,11 @@ from urllib import robotparser
 from urllib.parse import urljoin, urlparse
 
 import requests
-from bs4 import BeautifulSoup
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 from .. import config
+from . import dom
 from ..config import FETCH_TIMEOUT
 from .normalize import root_domain
 from .ssrf import url_block_reason
@@ -34,10 +34,6 @@ MAX_CANDIDATES_PER_PAGE = 60
 MAX_REDIRECTS = 5
 crawl_log = logging.getLogger("crawler")
 
-# lxml parses large pages notably faster than the pure-Python parser;
-# fall back transparently when it isn't installed.
-import importlib.util
-BS_PARSER = "lxml" if importlib.util.find_spec("lxml") else "html.parser"
 
 
 def make_session(retries: int = 1) -> requests.Session:
@@ -210,8 +206,9 @@ class Fetcher:
                        "OK" if raw is not None else reason, len(raw or b""))
         return raw, final_url, reason
 
-    def fetch_page(self, url: str) -> tuple[BeautifulSoup | None, str, str, str]:
-        """Fetch and parse. Returns (soup or None, raw text, final URL, reason)."""
+    def fetch_page(self, url: str) -> tuple[object | None, str, str, str]:
+        """Fetch and parse. Returns (dom.parse() tree or None, raw text,
+        final URL, reason)."""
         reason = url_block_reason(url)
         if reason:
             return None, "", url, f"blocked ({reason})"
@@ -227,21 +224,21 @@ class Fetcher:
             return None, "", final_url, reason
         t0 = time.perf_counter()
         try:
-            soup = BeautifulSoup(raw, BS_PARSER)
+            doc = dom.parse(raw)
         except Exception:
             return None, "", final_url, "unparseable HTML"
         self._time("parse", t0)
-        return soup, raw.decode("utf-8", "replace"), final_url, ""
+        return doc, raw.decode("utf-8", "replace"), final_url, ""
 
 
-def find_contact_links(soup: BeautifulSoup, base_url: str) -> list[str]:
+def find_contact_links(doc, base_url: str) -> list[str]:
     base_root = root_domain(base_url)
     out: list[str] = []
-    for a in soup.find_all("a", href=True):
-        href = a["href"].strip()
+    for a in dom.anchors(doc):
+        href = a.get("href").strip()
         if href.lower().startswith(("mailto:", "tel:", "javascript:", "#")):
             continue
-        txt = a.get_text(" ")
+        txt = dom.text(a, " ")
         if CONTACT_LINK_RE.search(href) or CONTACT_LINK_RE.search(txt):
             full = urljoin(base_url, href).split("#")[0]
             if not full.lower().startswith("http"):
@@ -257,14 +254,14 @@ def find_contact_links(soup: BeautifulSoup, base_url: str) -> list[str]:
     return out
 
 
-def external_links(soup: BeautifulSoup, page_url: str, skip_check,
+def external_links(doc, page_url: str, skip_check,
                    cap: int = MAX_CANDIDATES_PER_PAGE) -> list[str]:
     """Outbound links to distinct external domains (directory mining)."""
     page_root = root_domain(page_url)
     seen: set[str] = set()
     out: list[str] = []
-    for a in soup.find_all("a", href=True):
-        href = a["href"].strip()
+    for a in dom.anchors(doc):
+        href = a.get("href").strip()
         if not href.lower().startswith(("http://", "https://")):
             continue
         rd = root_domain(href)
