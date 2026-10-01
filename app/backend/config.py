@@ -225,12 +225,16 @@ MAX_CONTROLLER_ERRORS = 25       # consecutive controller-loop failures -> FAILE
 # MAX_ACTIVE_JOBS wait in a FIFO queue; a category is collected by one job at
 # a time (a second job for it queues behind the first); each client (browser)
 # may have MAX_JOBS_PER_CLIENT queued/running jobs.
-MAX_ACTIVE_JOBS = _int_env("MAX_ACTIVE_JOBS", 1 if SMALL_HOST else 4, 1, 32)
+# Small host: 3 at once, so a second / third user does not wait behind the
+# first. Page parsing shares one CPU lane (ANALYZE_THREADS), so concurrent
+# jobs split the CPU instead of thrashing it.
+MAX_ACTIVE_JOBS = _int_env("MAX_ACTIVE_JOBS", 3 if SMALL_HOST else 4, 1, 32)
 MAX_QUEUED_JOBS = _int_env("MAX_QUEUED_JOBS", 500, 1, 10_000)
 MAX_JOBS_PER_CLIENT = _int_env("MAX_JOBS_PER_CLIENT", 1, 1, 10)
 # Crawl threads across ALL running jobs; each job gets an equal slice
 # (at most CRAWL_WORKERS, at least 8). Bounds threads / sockets / memory.
-GLOBAL_CRAWL_WORKERS = _int_env("GLOBAL_CRAWL_WORKERS", 16 if SMALL_HOST else 192,
+# Small host: 48 = 16 per job at 3 jobs (16 measured as fast as 32 at 1 CPU).
+GLOBAL_CRAWL_WORKERS = _int_env("GLOBAL_CRAWL_WORKERS", 48 if SMALL_HOST else 192,
                                 16, 800)
 JOB_HISTORY = 300                # finished jobs kept for their owners' status
 # worker -> API status bundle cadence (s). Browsers poll every 3 s, so a
