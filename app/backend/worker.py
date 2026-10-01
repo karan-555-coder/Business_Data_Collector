@@ -332,8 +332,12 @@ def worker_main(conn, resume=None, init=None):
     try:
         if init is not None:         # test hook: install simulators
             init()
-        from .collector import analysis
+        from .collector import analysis, tls
         analysis.warm_up()
+        # Load the CA bundle now instead of inside the first job's first
+        # crawl (measured: 0.33 s CPU at 1 CPU, 3.6 s at 0.1 CPU).
+        threading.Thread(target=tls.shared_tls_context, daemon=True,
+                         name="tls-warmup").start()
         w = Worker(conn, resume)
         log.info("collection worker started (pid %d, %d job slots, %d crawl "
                  "threads per job)", os.getpid(), config.MAX_ACTIVE_JOBS,

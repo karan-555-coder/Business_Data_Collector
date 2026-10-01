@@ -35,6 +35,8 @@ _pool: ProcessPoolExecutor | None = None
 _pool_lock = threading.Lock()
 _disabled = False
 _breaks: list[float] = []          # times the pool broke (a worker died)
+# in-thread analysis takes turns (config.ANALYZE_THREADS at once)
+_lane = threading.BoundedSemaphore(config.ANALYZE_THREADS)
 MAX_POOL_BREAKS = 3                # per 10 minutes before in-thread fallback
 
 
@@ -118,7 +120,8 @@ def analyze(raw: bytes, url: str, extract: bool = True, contact_links: bool = Tr
     pool = _get_pool()
     if pool is None:
         try:
-            return analyze_html(*args)
+            with _lane:
+                return analyze_html(*args)
         except Exception as exc:
             return {"error": f"unparseable HTML ({type(exc).__name__})"}
     try:

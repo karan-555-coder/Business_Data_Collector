@@ -140,12 +140,68 @@ def test_health_alias():
     print("  /health: same lightweight probe as /api/health")
 
 
+def test_priority_crawl_pool():
+    import threading
+    from backend.collector.engine import PRIO_MINED, PRIO_PLACE, PRIO_RESULT
+    from backend.collector.prio_pool import PriorityThreadPool
+    pool = PriorityThreadPool(max_workers=1)
+    gate, order = threading.Event(), []
+    pool.submit(gate.wait)                     # occupy the only worker
+    futs = [pool.submit(order.append, name, prio=p) for name, p in (
+        ("mined1", PRIO_MINED), ("result1", PRIO_RESULT), ("place1", PRIO_PLACE),
+        ("mined2", PRIO_MINED), ("place2", PRIO_PLACE))]
+    gate.set()
+    for f in futs:
+        f.result(timeout=5)
+    assert order == ["place1", "place2", "result1", "mined1", "mined2"], order
+    blocker = threading.Event()
+    pool.submit(blocker.wait)
+    queued = pool.submit(order.append, "never", prio=PRIO_PLACE)
+    pool.shutdown(wait=False, cancel_futures=True)   # what a finished job does
+    blocker.set()
+    assert queued.cancelled() and "never" not in order
+    print("  crawl pool: places -> search results -> mined links, FIFO within, "
+          "cancel on shutdown")
+
+
+def test_analysis_lane():
+    import threading
+    from backend import config
+    from backend.collector import analysis
+    if config.ANALYZE_PROCESSES > 0:
+        print("  analysis lane: skipped (process pool in use on this machine)")
+        return
+    busy, peak, lock = [0], [0], threading.Lock()
+    real = analysis.analyze_html
+
+    def probe(*a):
+        with lock:
+            busy[0] += 1
+            peak[0] = max(peak[0], busy[0])
+        time.sleep(0.02)
+        with lock:
+            busy[0] -= 1
+        return {}
+    analysis.analyze_html = probe
+    try:
+        ts = [threading.Thread(target=analysis.analyze, args=(b"<p>x</p>", "https://a.com"))
+              for _ in range(12)]
+        [t.start() for t in ts]
+        [t.join() for t in ts]
+    finally:
+        analysis.analyze_html = real
+    assert peak[0] <= config.ANALYZE_THREADS, (peak[0], config.ANALYZE_THREADS)
+    print(f"  analysis lane: at most {config.ANALYZE_THREADS} page(s) analysed at once")
+
+
 def main():
     test_shared_tls()
     test_excel_only_when_changed()
     test_category_stats_cache()
     test_timeouts_from_env()
     test_health_alias()
+    test_priority_crawl_pool()
+    test_analysis_lane()
     print("\nALL PERFORMANCE TESTS PASSED")
 
 

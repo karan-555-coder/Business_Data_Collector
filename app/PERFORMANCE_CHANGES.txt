@@ -1,0 +1,220 @@
+PERFORMANCE CHANGES - Render Free (0.1 CPU / 512 MB), round 2
+Date: 2026-10-01
+Scope: speed of one 100-record collection. API, UI, scraped fields and Excel
+format unchanged. No paid service, no new dependency, robots.txt and access
+controls still respected.
+
+=============================================================================
+HOW EVERYTHING BELOW WAS MEASURED
+=============================================================================
+Harness: app/tests/loadtest/bench_render_free.py (Windows). It runs one real
+collection (category Advisory, country USA, keyword "management consulting",
+target 100, fresh state) in a process confined by a Windows Job Object hard
+cap to BENCH_CPUS CPU and 512 MB, with the render.yaml env overrides
+(SCRAPER_CONCURRENCY=32, MAX_ACTIVE_JOBS=1, ANALYZE_PROCESSES=0, ...).
+It records stage times, crawl-queue wait, CPU by stage (per-thread CPU
+attributed to the sampled stack), peak RAM, failures and connections.
+
+Calibration: the UNMODIFIED code at BENCH_CPUS=1.0 took 35.1 s for 100
+records (live Serper) - the same ~35 s seen on Render. So "1 CPU" below is
+Render Free as observed; "0.1 CPU" is the advertised worst case.
+
+Serper replay: after the first runs, Serper responses are recorded and
+replayed with their recorded latency, so before/after runs get identical
+search results and repeat runs cost no credits. Before and after runs were
+always interleaved (before, after, before, after ...). The machine's load
+changed during the session, so only runs from the same interleaved batch
+are compared with each other.
+
+Serper credits spent by all benchmarking: see the final section.
+
+=============================================================================
+PROFILE OF THE ORIGINAL CODE (no guessing - measured)
+=============================================================================
+0.1 CPU, live:  385.4 s for 100 records, CPU busy 102% of the cap.
+  CPU by stage: HTML parse/extract 57%, network stack (TLS, reads, DNS)
+  ~20%, Excel 4%, TLS context load 3%.
+  Crawl tasks waited 107 s on average in the queue; analysing one page took
+  50 s of wall time (CPU starvation).
+1 CPU, live:    35.1 s for 100 records, CPU busy 93% of the cap.
+  CPU by stage: HTML parse/extract 64%, network reads 14%, TLS 5%, DNS 2%.
+  Serper: 25 requests, avg 3.7 s, max 7.1 s, 0 x 429, 0 timeouts.
+  Crawl tasks waited 12.3 s on average in the queue.
+  Places listings: 85 of 100 records; organic results + directory-mined
+  links: 15 records from ~160 crawl tasks.
+  Excel/state writes: 2 Excel writes (0.7 s), 8 state saves (0.9 s) - small.
+  Status bundle for the browser: 2.6 ms CPU per publish - negligible.
+  Peak RAM 160 MB (limit 512).
+
+TOP 3 BOTTLENECKS
+  1. CPU wasted by 32 crawl threads parsing HTML at the same time.
+     Offline (same 192 real pages): 95 ms CPU/page with 32 threads at
+     once vs 26-41 ms one at a time; under a 0.1-CPU cap 122 vs 74 ms.
+  2. FIFO crawl queue on a saturated pool: high-yield Google Places
+     listings (~70% become a record) waited behind directory-mined links
+     (~10%), so ~275 crawl tasks were needed for 100 records.
+  3. One-time CA-bundle load (shared TLS context) paid inside the first
+     job's first crawl: 0.33 s CPU at 1 CPU, 3.6 s wall at 0.1 CPU.
+  (Serper latency 3-4 s per request sets the time to the first record,
+  ~3-4 s; it is Serper's response time, not something the app can cut.)
+
+=============================================================================
+CHANGE #1
+Problem:        32 crawl threads analysed HTML at once on <= 1 CPU; GIL and
+                cache contention made each page cost 2-3x more CPU.
+File changed:   app/backend/config.py, app/backend/collector/analysis.py
+Function/class: config.ANALYZE_THREADS (new setting); analysis.analyze()
+What changed:   In-thread page analysis (ANALYZE_PROCESSES=0, the small-host
+                default) goes through a semaphore of ANALYZE_THREADS permits
+                (default = number of CPUs, minimum 1; 1 on Render Free).
+                Fetching stays fully parallel. Hosts that use the process
+                pool are unaffected.
+Before:         offline 95.2 ms CPU/page (32 threads), 121.7 ms at 0.1 CPU;
+                live 1 CPU: 35.1 s, HTML-analysis CPU 20.7 s
+After:          offline 40.7 ms CPU/page, 74.1 ms at 0.1 CPU;
+                live 1 CPU: 31.4 s, HTML-analysis CPU 7.8 s
+Why:            On a fraction of a core, parallel CPU work buys nothing and
+                costs context switches and GIL hand-offs.
+Benchmark:      single live runs (no replay yet) at 1 CPU, see above
+Status:         DONE, kept
+
+=============================================================================
+CHANGE #2
+Problem:        FIFO crawl queue; low-yield work ran before high-yield work.
+File changed:   app/backend/collector/prio_pool.py (new),
+                app/backend/collector/engine.py
+Function/class: PriorityThreadPool, _PriorityWorkQueue (new);
+                CollectionJob._submit_task, _submit_crawl, _submit_place,
+                _new_crawl_pool; constants PRIO_PLACE/PRIO_RESULT/PRIO_MINED
+What changed:   The crawl pool runs queued tasks by priority: Places
+                listings first, then search-result sites, then
+                directory-mined links; FIFO within a priority. Priority is
+                kept when a jammed pool is replaced. Queued tasks are still
+                cancelled the moment the target is reached.
+Before:         (replay, 1 CPU, changes #1+#2 vs original, same batch)
+                37.8 / 37.2 / 36.9 s; 238-266 crawl tasks; 206-225 page fetches
+After:          29.1 / 25.5 / 24.6 s; 209-215 crawl tasks; 178-183 page fetches
+Why:            The target is reached with fewer crawls; whatever is left in
+                the queue at that point is never fetched.
+Benchmark:      interleaved replay runs, see above
+Status:         DONE, kept
+
+=============================================================================
+CHANGE #3
+Problem:        The CA bundle was loaded inside the first job's first crawl.
+File changed:   app/backend/worker.py
+Function/class: worker_main()
+What changed:   A daemon thread builds the shared TLS context when the
+                worker process starts (before any job). A crawl that arrives
+                first simply waits on the same lock as before.
+Before:         0.33 s CPU (1 CPU) / 3.6 s wall (0.1 CPU) inside the first job
+After:          paid at worker start-up, outside any job
+Why:            Moves fixed cost off the first job's critical path.
+Benchmark:      tlscost measurement (shared_tls_context() alone, capped)
+Status:         DONE, kept
+
+=============================================================================
+CHANGE #4
+Problem:        No repeatable way to measure Render-Free speed.
+File changed:   app/tests/loadtest/bench_render_free.py (new),
+                app/tests/test_performance.py, app/.env.example
+Function/class: test_priority_crawl_pool(), test_analysis_lane() (new tests)
+What changed:   Benchmark harness described at the top; unit tests for the
+                priority order / cancel-on-shutdown and the analysis lane;
+                ANALYZE_THREADS documented in .env.example.
+Before:         -
+After:          python tests/test_performance.py -> ALL PERFORMANCE TESTS PASSED
+Why:            Keeps the numbers reproducible and the behaviour guarded.
+Benchmark:      n/a
+Status:         DONE
+
+=============================================================================
+MEASURED AND REJECTED / NOT NEEDED
+=============================================================================
+R1  Strip <script>/<style> before lxml parsing (48% of page bytes).
+    Result: 51.6 -> 57.9 ms/page (slower) and the company name changed on
+    4 of 192 pages. Status: REJECTED.
+R2  Read at most 500 KB / 750 KB / 1 MB per page (default 2 MB).
+    Result: saves 15.5% / 7.5% / 4.2% of bytes but changes extracted data
+    on 11 / 3 / 2 of 192 pages. Status: REJECTED (output must not change).
+R3  Crawl threads 16 / 24 / 32 / 48 (replay, 1 CPU).
+    16: 26.0, 22.4 s   24: 21.9, 22.7, 22.8 s   32: 23.9, 22.9 s   48: 27.3 s
+    No reliable difference between 16 and 32; 48 was slower.
+    Status: KEPT 32 (render.yaml) - "do not blindly increase concurrency".
+R4  Python GIL switch interval 20 ms / 50 ms (default 5 ms).
+    28.1 s / 23.6 s vs 22.9-23.9 s default. No gain. Status: REJECTED.
+R5  Fetch robots.txt and the homepage in parallel.
+    Measured 224 new connections for ~370 site requests: robots.txt and the
+    homepage already share one keep-alive connection. Doing them in
+    parallel needs a second TCP+TLS handshake per site, i.e. MORE CPU on a
+    host that is CPU-bound. Status: NOT DONE (robots.txt still checked
+    before every fetch).
+R6  Frontend polling / status publishing.
+    Status bundle: 2.6 ms CPU per publish (0.06 CPU-s per run); the page
+    already polls on one chain, server-driven cadence, backoff, 30 s when
+    hidden. Status: NO CHANGE NEEDED.
+R7  Excel / state writes.
+    Already batched in a background saver thread, unchanged files never
+    rewritten: 2 Excel writes (0.65 s) + 7 state saves per 1-CPU run.
+    Status: NO CHANGE NEEDED.
+R8  Timeouts / retries / dedup (verified, unchanged).
+    Fetch timeouts 5 s connect / 12 s read / 25 s deadline: 0 fetch
+    timeouts in the runs; shorter values would drop live sites whose TLS
+    handshake is CPU-starved at 0.1 CPU. Website 5xx retried once, 403/404/
+    429 never retried; Serper 429/5xx/timeouts backed off (timeout resent at
+    most once - it may be billed). Domain/URL/search dedup and in-flight
+    Serper dedup already present. Status: NO CHANGE NEEDED.
+
+=============================================================================
+FINAL BENCHMARK (same 100-record test, interleaved, Serper replay)
+=============================================================================
+All runs: 100 of 100 valid records, status completed, Excel verified
+(row count = records). Same searches in every run (replayed).
+
+A) Strict 0.1 CPU / 512 MB (Render Free as advertised), same batch
+   BEFORE: 94.4 s   (63.6 records/min, CPU 10.0 s, peak RAM 164 MB,
+                     239 crawl tasks, 206 page fetches, first record 8.3 s)
+   AFTER:  71.8 s   (83.6 records/min, CPU 7.5 s, peak RAM 117 MB,
+                     210 crawl tasks, 186 page fetches, first record 4.1 s)
+   IMPROVEMENT: 23.9 %
+
+B) 1 CPU (Render Free as observed - original code = 35 s), final batch
+   BEFORE: 14.2 / 12.5 / 13.4 s   mean 13.4 s  (448 records/min)
+   AFTER:  11.4 / 10.6 / 11.3 s   mean 11.1 s  (541 records/min)
+   IMPROVEMENT: 17.0 %
+
+C) 1 CPU, earlier batch while this PC was fully CPU-bound (as Render is:
+   CPU busy 91-93% of the cap), changes #1+#2 only
+   BEFORE: 37.8 / 37.2 / 36.9 s   mean 37.3 s  (161 records/min)
+   AFTER:  29.1 / 25.5 / 24.6 s   mean 26.4 s  (227 records/min)
+   IMPROVEMENT: 29.2 %
+
+Why the absolute times differ between batches: this PC's background load
+changed during the session (CPU used for the same work fell ~3x between
+batch C and batch B). Only runs from the same interleaved batch are
+compared. The gain is largest when the host is CPU-bound, which is the
+Render Free situation.
+
+Not measured: a run on Render itself (no deployment was made).
+
+Serper credits used by all profiling/benchmarking today: 290
+(balance 1176 -> 886), of which 150 were lost to one harness bug (the
+profiling wrapper rejected the new `prio` argument, so no crawl ran); the
+harness now stops a run when credits are spent but no crawl completes.
+
+REMAINING BOTTLENECKS
+  - Serper answers in 3-4 s per request: sets the time to the first record.
+  - Network stack CPU per site (TLS handshake, reading, DNS) is now the
+    largest CPU consumer; it can only shrink by crawling fewer sites.
+  - At a true 0.1 CPU everything is CPU-bound (CPU busy 104% of the cap);
+    the only big further gain there is more CPU.
+
+FINAL CHECKS
+  - tests/test_concurrency, test_credits, test_performance (+2 new tests),
+    test_pipeline, test_resilience, test_security: ALL PASSED
+  - python -m compileall backend tests: OK; backend.main / serve / worker /
+    hub import; API routes unchanged
+  - Excel output verified in every benchmark run (row count check)
+  - render.yaml and requirements.txt unchanged; no new dependency; config
+    picks ANALYZE_THREADS=1 on Render automatically (cgroup quota 0.1)
+  - No paid service added.

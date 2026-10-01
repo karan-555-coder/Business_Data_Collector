@@ -58,6 +58,7 @@ from .discovery import TIER_HELP, DiscoveryPlanner, SearchRequest
 from .exporter import write_category_file, write_master_summary
 from .extractor import Extracted, split_address
 from .geo import expansion_geos, nearby_geos
+from .prio_pool import PriorityThreadPool
 from .normalize import clean_text, norm_domain, norm_name
 from .search import ProviderDisabled, make_provider
 from .validator import confidence, is_aggregator, is_skip_domain, validate
@@ -84,6 +85,11 @@ ORGANIC_SAMPLE_EVERY = 4      # ... otherwise sample 1 cell in 4 to keep measuri
 KIND_WARMUP_CREDITS = 4       # both kinds are measured this long before judging
 EXPLORE_MIN_REMAINING = 250   # records still needed to justify exploration
 TERMINAL_STATUSES = ("completed", "stopped", "exhausted", "failed")
+# Crawl queue order (lower first). Measured yield per crawl task (Advisory /
+# USA, 100 records): Places listings 70%, search results + mined directory
+# links together 12%. The pool is saturated on a small host, so the
+# high-yield work goes first and the target is reached with fewer crawls.
+PRIO_PLACE, PRIO_RESULT, PRIO_MINED = 0, 1, 2
 
 
 class JobFailed(Exception):
@@ -558,7 +564,7 @@ class CollectionJob:
         self.fetcher.timings = self.timings
         self.provider = None
         self.planner: DiscoveryPlanner | None = None
-        self._pool: ThreadPoolExecutor | None = None
+        self._pool: PriorityThreadPool | None = None
         self.attempted: set[str] = set()
         self.lock = threading.Lock()
 
@@ -990,19 +996,19 @@ class CollectionJob:
                 self._running.pop(id(info), None)
 
     def _submit_task(self, op: str, url: str, query: str, fn, *args,
-                     on_result=None, info: dict | None = None):
+                     on_result=None, info: dict | None = None, prio: int = 0):
         """Submit fn(*args) to the crawl pool, tracked for backlog accounting,
         the stuck-task watchdog and pool replacement."""
         if self.done() or self._pool is None:
             return None
         if info is None:
             info = {"op": op, "url": url, "query": query, "fn": fn,
-                    "args": args, "on_result": on_result}
+                    "args": args, "on_result": on_result, "prio": prio}
         info.update(fut=None, t=None, worker="", abandoned=False)
         with self._run_lock:
             self._tasks[id(info)] = info
         try:
-            fut = self._pool.submit(self._guarded, info)
+            fut = self._pool.submit(self._guarded, info, prio=info.get("prio", 0))
         except RuntimeError:   # pool shutting down (job ending / being replaced)
             with self._run_lock:
                 self._tasks.pop(id(info), None)
@@ -1045,13 +1051,14 @@ class CollectionJob:
                     self._submit_crawl(u, query, False, lk)
         if self._submit_task("crawl", url, query, self.crawl_site, url, query,
                              allow_mining, lk,
-                             on_result=mine if allow_mining else None) is not None:
+                             on_result=mine if allow_mining else None,
+                             prio=PRIO_RESULT if allow_mining else PRIO_MINED) is not None:
             self._bump("candidate_urls")
 
     def _submit_place(self, place: dict, query: str, lk: str = ""):
         site = clean_text(place.get("website") or "") or clean_text(place.get("title") or "")
         if self._submit_task("enrich_place", site, query, self.enrich_place,
-                             place, query, lk) is not None:
+                             place, query, lk, prio=PRIO_PLACE) is not None:
             self._bump("candidate_urls")
 
     # -- search ---------------------------------------------------------------
@@ -1516,8 +1523,8 @@ class CollectionJob:
                 except Exception:
                     log.exception("job finish callback failed")
 
-    def _new_crawl_pool(self) -> ThreadPoolExecutor:
-        return ThreadPoolExecutor(
+    def _new_crawl_pool(self) -> PriorityThreadPool:
+        return PriorityThreadPool(
             max_workers=self.crawl_workers,
             thread_name_prefix=f"crawl{self.counters['pool_restarts'] or ''}")
 

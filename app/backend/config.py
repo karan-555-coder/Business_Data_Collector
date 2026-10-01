@@ -166,6 +166,12 @@ ANALYZE_PROCESSES = _int_env("ANALYZE_PROCESSES",
                              # on a small host, else one per spare real CPU
                              0 if SMALL_HOST else
                              max(1, min(8, int(EFFECTIVE_CPUS) - 2)), 0, 16)
+# Pages analysed at the same time when parsing runs in the crawl threads
+# (ANALYZE_PROCESSES=0). Measured: 32 threads parsing at once cost 95 ms
+# CPU per page (GIL / cache thrash) vs 41 ms one at a time (122 vs 74 ms
+# under a 0.1-CPU cap), so on a small host page analysis takes turns;
+# fetches stay fully parallel.
+ANALYZE_THREADS = _int_env("ANALYZE_THREADS", max(1, round(EFFECTIVE_CPUS)), 1, 64)
 
 # ---- Serper client tuning (all overridable in .env) ------------------------
 SERPER_CONCURRENCY = _int_env("SERPER_CONCURRENCY", 6, 1, 16)  # requests in flight

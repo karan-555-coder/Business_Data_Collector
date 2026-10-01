@@ -1135,3 +1135,69 @@ on Render Free as before.
 * Tests: `test_performance.py` gained `test_timeouts_from_env` (defaults, overrides, clamping, in a
   subprocess) and `test_health_alias`. All six suites pass; a live server on `0.0.0.0:$PORT` answers
   both health routes in ~20 ms.
+
+---
+
+# Round 2 (2026-10-01): measured Render-Free profile and fixes
+
+Per-change detail (problem, file, function, before/after, status) and the
+rejected experiments are in [`PERFORMANCE_CHANGES.txt`](PERFORMANCE_CHANGES.txt).
+
+## How it was measured
+
+`tests/loadtest/bench_render_free.py` (Windows) runs one real 100-record
+collection (Advisory / USA / "management consulting", fresh state) in a
+process held to `BENCH_CPUS` CPU and 512 MB by Windows Job Object hard caps,
+with the `render.yaml` env overrides. It reports stage times, crawl-queue
+wait, CPU per stage, peak RAM, failures and connection counts. Serper
+responses are recorded and replayed with their real latency, so before and
+after runs see identical searches. Before and after runs were interleaved.
+
+Calibration: the original code at 1 CPU took **35.1 s**, the same as on
+Render, so 1 CPU = Render Free as observed; 0.1 CPU = the advertised limit.
+
+## Bottlenecks found (original code)
+
+| # | Bottleneck | Evidence |
+|---|---|---|
+| 1 | 32 crawl threads parsing HTML at once | 57–64% of all CPU; 95 ms CPU/page vs 41 ms one at a time (122 vs 74 ms at 0.1 CPU) |
+| 2 | FIFO crawl queue on a saturated pool | Places listings ~70% yield waited behind directory links ~10%; ~240–275 crawl tasks per 100 records; tasks queued 12 s (1 CPU) / 107 s (0.1 CPU) |
+| 3 | CA bundle loaded inside the first job | 0.33 s CPU at 1 CPU, 3.6 s wall at 0.1 CPU |
+
+Measured and found **not** to be bottlenecks: Excel/state writes (2 Excel
+writes, 0.65 s per run), status publishing (2.6 ms CPU per bundle), frontend
+polling (already server-paced with backoff), Serper 429s/timeouts (none),
+memory (peak 106–168 MB of 512).
+
+## Changes
+
+| Change | Files | What |
+|---|---|---|
+| Analysis lane | `config.py` (`ANALYZE_THREADS`), `collector/analysis.py` (`analyze`) | In-thread page analysis takes turns (1 at a time on Render); downloads stay parallel |
+| Priority crawl queue | `collector/prio_pool.py` (new), `collector/engine.py` (`_submit_task`, `_submit_crawl`, `_submit_place`, `_new_crawl_pool`) | Places listings → search results → mined links; FIFO within; queued work cancelled at target |
+| TLS warm-up | `worker.py` (`worker_main`) | Shared TLS context built at worker start, off the first job |
+| Benchmark + tests | `tests/loadtest/bench_render_free.py` (new), `tests/test_performance.py`, `.env.example` | Repeatable Render-Free benchmark; tests for priority order and the lane |
+
+Rejected after measuring: stripping `<script>`/`<style>` before parsing
+(slower, changed names), capping page bytes (changed extracted data), 48
+crawl threads (slower), larger GIL switch interval (no gain), parallel
+robots.txt + homepage (adds a TLS handshake per site on a CPU-bound host).
+
+## Results (same 100-record test, 100/100 records every run)
+
+| Condition | Before | After | Improvement | After records/min |
+|---|---|---|---|---|
+| 0.1 CPU (strict Render Free) | 94.4 s | 71.8 s | 23.9% | 83.6 |
+| 1 CPU, final batch (mean of 3) | 13.4 s | 11.1 s | 17.0% | 541 |
+| 1 CPU, CPU-bound batch (mean of 3, changes 1+2) | 37.3 s | 26.4 s | 29.2% | 227 |
+
+Absolute times differ between batches because this PC's background load
+changed during the session; only same-batch runs are compared. Not yet
+measured on Render itself.
+
+## Remaining limitations
+
+- Serper takes 3–4 s per search, which sets the time to the first record.
+- Per-site network CPU (TLS, reads, DNS) is now the largest CPU cost.
+- At a true 0.1 CPU the run is fully CPU-bound; only more CPU helps further.
+- No paid service, new dependency or `render.yaml` change was added.
