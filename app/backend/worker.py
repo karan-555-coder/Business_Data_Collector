@@ -315,6 +315,12 @@ def worker_main(conn, resume=None, init=None):
     signal.signal(signal.SIGINT, signal.SIG_IGN)
     if hasattr(signal, "SIGBREAK"):          # Windows Ctrl+Break: same story
         signal.signal(signal.SIGBREAK, signal.SIG_IGN)
+    if os.name != "nt":
+        # Same for SIGTERM on Linux: a host shutting the app down (a Render
+        # deploy / restart) may signal the whole process group. The API
+        # handles it and stops this worker over the pipe; if the API is
+        # gone the pipe breaks and the worker still saves and exits.
+        signal.signal(signal.SIGTERM, signal.SIG_IGN)
     listener = _setup_logging()
     if hasattr(os, "nice"):
         # Crawling must not starve the API process on a small CPU share:

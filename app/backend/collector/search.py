@@ -15,6 +15,7 @@ from abc import ABC, abstractmethod
 import requests
 
 from .. import config
+from .tls import SharedTLSAdapter
 
 log = logging.getLogger("search")
 
@@ -416,7 +417,7 @@ def _serper_session() -> requests.Session:
     s = requests.Session()
     # keep-alive pool sized to the search concurrency (requests' default
     # of 10 would silently serialise anything above that)
-    adapter = requests.adapters.HTTPAdapter(
+    adapter = SharedTLSAdapter(
         pool_connections=2, pool_maxsize=config.SERPER_CONCURRENCY + 4)
     s.mount("https://", adapter)
     s.headers.update({"Content-Type": "application/json"})

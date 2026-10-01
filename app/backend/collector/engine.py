@@ -146,6 +146,7 @@ class StateStore:
         self.rev = 0
         self.cat_rev: dict[str, int] = defaultdict(int)
         self._stats_cache: tuple[int, dict] | None = None
+        self._cat_stats: dict[str, tuple[int, dict]] = {}   # slug -> (cat_rev, stats)
         # In-flight Serper request dedup shared by ALL jobs: two jobs issuing
         # the same normalized request at once pay for it only once.
         self.sf_lock = threading.Lock()
@@ -182,15 +183,25 @@ class StateStore:
     def category_stats(self) -> dict[str, dict]:
         """slug -> {count, emails, websites}; recomputed only when records
         changed since the last call (the API used to rescan every record of
-        every category on every status poll)."""
+        every category on every status poll), and then only for the
+        categories that changed: a running job adds records to ONE category,
+        and rescanning all ~10,000 records of every category on each status
+        bundle (every 0.5 s) cost ~2.5 ms each time."""
         with self.lock:
             cached = self._stats_cache
             if cached is not None and cached[0] == self.rev:
                 return cached[1]
-            out = {c: {"count": len(rs),
-                       "emails": sum(1 for r in rs if r.get("Business Email")),
-                       "websites": sum(1 for r in rs if r.get("Official Website"))}
-                   for c, rs in self.records.items()}
+            out = {}
+            for c, rs in self.records.items():
+                rev = self.cat_rev.get(c, 0)
+                hit = self._cat_stats.get(c)
+                if hit is None or hit[0] != rev:
+                    hit = (rev, {"count": len(rs),
+                                 "emails": sum(1 for r in rs if r.get("Business Email")),
+                                 "websites": sum(1 for r in rs
+                                                 if r.get("Official Website"))})
+                    self._cat_stats[c] = hit
+                out[c] = hit[1]
             self._stats_cache = (self.rev, out)
             return out
 
@@ -241,8 +252,10 @@ class StateStore:
         if dirty and path:
             self.save(path)
 
-    def export_categories(self, categories, out_dir: str | None = None):
-        """Regenerate the given categories' Excel files + the master summary."""
+    def export_categories(self, categories, out_dir: str | None = None,
+                          force: bool = False):
+        """Regenerate the given categories' Excel files + the master summary
+        (each skipped when its content is unchanged, unless force)."""
         out_dir = out_dir or config.OUTPUT_DIR
         cats = self.all_categories()
         with self.lock:
@@ -251,7 +264,7 @@ class StateStore:
         for c in categories:
             if c in cats:
                 write_category_file(cats[c]["display"], cats[c]["file"],
-                                    records.get(c, []), out_dir)
+                                    records.get(c, []), out_dir, force=force)
         write_master_summary(cats, records, stats, out_dir)
 
     def cache_get(self, key: str):
@@ -1786,8 +1799,9 @@ class CollectionJob:
         export_note = ""
         for attempt in range(2):
             try:
-                if attempt:   # checkpoint(force=True) above already exported
-                    self.state.export_categories([self.category])
+                if attempt:   # checkpoint(force=True) above already exported;
+                    # the file on disk disagrees, so rewrite it regardless
+                    self.state.export_categories([self.category], force=True)
                 rows = self._excel_rows()
                 if rows == len(recs):
                     export_note = f"Excel verified: {rows} rows."

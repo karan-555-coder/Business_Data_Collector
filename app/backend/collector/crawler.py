@@ -13,7 +13,6 @@ from urllib import robotparser
 from urllib.parse import urljoin, urlparse
 
 import requests
-from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 from .. import config
@@ -21,6 +20,7 @@ from . import dom
 from ..config import FETCH_TIMEOUT
 from .normalize import root_domain
 from .ssrf import url_block_reason
+from .tls import SharedTLSAdapter
 
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -50,9 +50,11 @@ def make_session(retries: int = 1) -> requests.Session:
         # values and freeze worker threads.
         respect_retry_after_header=False,
     )
-    adapter = HTTPAdapter(max_retries=retry,
-                          pool_connections=config.KEEPALIVE_CONNECTIONS,
-                          pool_maxsize=config.MAX_CONNECTIONS)
+    # one pre-loaded TLS context for all sites (see tls.py): a fresh one per
+    # connection cost more CPU than parsing the page
+    adapter = SharedTLSAdapter(max_retries=retry,
+                               pool_connections=config.KEEPALIVE_CONNECTIONS,
+                               pool_maxsize=config.MAX_CONNECTIONS)
     s.mount("http://", adapter)
     s.mount("https://", adapter)
     s.headers.update({
@@ -74,7 +76,7 @@ class RobotsCache:
     without limit for the job's lifetime."""
 
     DEAD = "dead"
-    MAX_HOSTS = 20_000
+    MAX_HOSTS = config.ROBOTS_CACHE_HOSTS
     TTL_S = 3600.0
     _store: "OrderedDict[str, tuple[object, float]]" = OrderedDict()
     _store_lock = threading.Lock()
@@ -106,7 +108,7 @@ class RobotsCache:
         if not have:
             rp = None
             try:
-                r = self.session.get(base + "/robots.txt", timeout=(4, 8),
+                r = self.session.get(base + "/robots.txt", timeout=config.ROBOTS_TIMEOUT,
                                      allow_redirects=False)
                 if r.status_code == 200 and "html" not in r.headers.get("Content-Type", "").lower():
                     rp = robotparser.RobotFileParser()

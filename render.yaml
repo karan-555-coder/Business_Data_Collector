@@ -28,3 +28,10 @@ services:
         value: "32"
       - key: SCRAPER_CONCURRENCY
         value: "32"
+      # CPU / memory savers (also the automatic small-host defaults)
+      - key: EXPORT_MIN_INTERVAL
+        value: "60"          # mid-run Excel refresh, seconds
+      - key: STATUS_PUBLISH_INTERVAL
+        value: "1"           # worker -> API status cadence, seconds
+      - key: ROBOTS_CACHE_HOSTS
+        value: "2000"        # robots.txt answers kept in memory

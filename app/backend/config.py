@@ -34,6 +34,13 @@ def _int_env(name: str, default: int, lo: int, hi: int) -> int:
         return default
 
 
+def _float_env(name: str, default: float, lo: float, hi: float) -> float:
+    try:
+        return max(lo, min(hi, float(os.environ.get(name, "") or default)))
+    except ValueError:
+        return default
+
+
 def _read_first(*paths: str) -> str:
     for p in paths:
         try:
@@ -136,10 +143,20 @@ STATE_PATH = os.path.join(OUTPUT_DIR, "demo_state.json")
 CRAWL_WORKERS = _int_env("SCRAPER_CONCURRENCY",
                          _int_env("APP_CRAWL_WORKERS", 16 if SMALL_HOST else 48,
                                   4, 100), 4, 100)
-FETCH_TIMEOUT = (5, 12)          # (connect, read) - dead hosts fail fast
-EXPORT_MIN_INTERVAL = 30.0       # mid-run Excel regeneration (final export
-                                 # always happens; the state JSON is the
-                                 # crash-safe checkpoint)
+# (connect, read) seconds per request - dead hosts fail fast. Not lower by
+# default on small hosts: a CPU-starved TLS handshake then times out and a
+# live site is skipped as dead (measured at 0.1 CPU).
+FETCH_TIMEOUT = (_float_env("FETCH_CONNECT_TIMEOUT", 5.0, 1.0, 60.0),
+                 _float_env("FETCH_READ_TIMEOUT", 12.0, 2.0, 120.0))
+# robots.txt probe (connect, read); a connect/timeout failure marks the host dead
+ROBOTS_TIMEOUT = (_float_env("ROBOTS_CONNECT_TIMEOUT", 4.0, 1.0, 60.0),
+                  _float_env("ROBOTS_READ_TIMEOUT", 8.0, 2.0, 120.0))
+# Mid-run Excel regeneration, seconds (the final export always happens; the
+# state JSON is the crash-safe checkpoint). A 2,000-row sheet costs ~0.5 s
+# of CPU - ~5 s of wall time on a 0.1-CPU host - so small hosts refresh the
+# mid-run files less often. Unchanged files are never rewritten.
+EXPORT_MIN_INTERVAL = _float_env("EXPORT_MIN_INTERVAL", 60.0 if SMALL_HOST else 30.0,
+                                 5.0, 3600.0)
 STATE_SAVE_INTERVAL = 5.0
 
 # HTML parsing/extraction runs in worker processes (off the GIL).
@@ -158,11 +175,6 @@ SEARCH_PREFETCH = _int_env("SEARCH_PREFETCH", 3, 1, 8)  # queries searched ahead
 SEARCH_BACKLOG_LIMIT = 2         # x CRAWL_WORKERS: queued crawl tasks above
                                  # which no new searches are launched
 PLACES_MAX_PAGE = 3              # follow-up Places pages for productive queries
-def _float_env(name: str, default: float, lo: float, hi: float) -> float:
-    try:
-        return max(lo, min(hi, float(os.environ.get(name, "") or default)))
-    except ValueError:
-        return default
 
 
 # Spend safety valve per run: credits <= max(2 x max_queries, target x this).
@@ -180,14 +192,20 @@ SERPER_TIMEOUT_RETRIES = _int_env("SERPER_TIMEOUT_RETRIES", 1, 0, 3)
 # old 15 s read timeout gave up just before the answer and then paid for the
 # same request again (53 timeouts, 44 of them re-sent successfully). Searches
 # run in their own pool, so waiting longer never stalls the crawl pipeline.
-SERPER_TIMEOUT = (5, 30)
+SERPER_TIMEOUT = (_float_env("SERPER_CONNECT_TIMEOUT", 5.0, 1.0, 60.0),
+                  _float_env("SERPER_READ_TIMEOUT", 30.0, 5.0, 120.0))
 SEARCH_CACHE_TTL = 7 * 24 * 3600  # re-use a search response for a week
 SEARCH_CACHE_MAX = 1000           # entries (Places rows are trimmed first)
 MAX_CONNECTIONS = _int_env("MAX_CONNECTIONS", 100, 16, 200)
 KEEPALIVE_CONNECTIONS = _int_env("KEEPALIVE_CONNECTIONS", 100, 16, 200)
+# robots.txt answers kept in memory (LRU, 1 h TTL). A parsed robots.txt is
+# ~1-22 KB (measured), so 20,000 hosts can hold ~20-400 MB; each company
+# site is crawled once anyway, so a small host keeps far fewer.
+ROBOTS_CACHE_HOSTS = _int_env("ROBOTS_CACHE_HOSTS", 2000 if SMALL_HOST else 20_000,
+                              100, 100_000)
 PER_DOMAIN_CONCURRENCY = 1       # by design: one page at a time per website
-FETCH_DEADLINE = 25.0            # total seconds per page (slow-drip bodies);
-                                 # read/5xx retries: crawler.make_session
+# total seconds per page (slow-drip bodies); read/5xx retries: crawler.make_session
+FETCH_DEADLINE = _float_env("FETCH_DEADLINE", 25.0, 5.0, 300.0)
 
 # ---- Collection watchdog (fault tolerance) ---------------------------------
 STUCK_TASK_S = _int_env("STUCK_TASK_S", 180, 5, 3600)       # abandon a crawl task
@@ -209,7 +227,10 @@ MAX_JOBS_PER_CLIENT = _int_env("MAX_JOBS_PER_CLIENT", 1, 1, 10)
 GLOBAL_CRAWL_WORKERS = _int_env("GLOBAL_CRAWL_WORKERS", 16 if SMALL_HOST else 192,
                                 16, 800)
 JOB_HISTORY = 300                # finished jobs kept for their owners' status
-STATUS_PUBLISH_INTERVAL = 0.5    # worker -> API status bundle cadence (s)
+# worker -> API status bundle cadence (s). Browsers poll every 3 s, so a
+# small host publishes once a second instead of twice.
+STATUS_PUBLISH_INTERVAL = _float_env("STATUS_PUBLISH_INTERVAL",
+                                     1.0 if SMALL_HOST else 0.5, 0.2, 10.0)
 WORKER_RESTARTS_MAX = 5          # crash restarts per 10 min before giving up
 
 # ---- API protection ---------------------------------------------------------
@@ -221,8 +242,9 @@ WORKER_RESTARTS_MAX = 5          # crash restarts per 10 min before giving up
 RATE_LIMIT_CLIENT_PER_MIN = _int_env("RATE_LIMIT_CLIENT_PER_MIN", 240, 10, 100_000)
 RATE_LIMIT_COLLECT_PER_MIN = _int_env("RATE_LIMIT_COLLECT_PER_MIN", 10, 1, 10_000)
 RATE_LIMIT_IP_PER_MIN = _int_env("RATE_LIMIT_IP_PER_MIN", 60_000, 100, 100_000_000)
-POLL_MS_ACTIVE = 3000            # status poll cadence suggested to the browser
-POLL_MS_IDLE = 10_000            # ... when that browser has no running job
+# status poll cadence the server suggests to the browser (the page follows it)
+POLL_MS_ACTIVE = _int_env("POLL_MS_ACTIVE", 3000, 1000, 60_000)
+POLL_MS_IDLE = _int_env("POLL_MS_IDLE", 10_000, 2000, 300_000)  # no running job
 
 APP_VERSION = "1.1.0"
 

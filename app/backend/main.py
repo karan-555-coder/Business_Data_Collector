@@ -497,6 +497,7 @@ FAST_ROUTES = {
     "/api/health": h_health, "/api/status": h_status, "/api/config": h_config,
     "/api/records": h_records, "/api/files": h_files,
     "/": h_index, "/favicon.ico": h_favicon,
+    "/health": h_health,   # platform probes; outside /api, so no auth/rate limit
 }
 
 

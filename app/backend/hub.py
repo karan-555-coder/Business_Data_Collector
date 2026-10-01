@@ -120,7 +120,7 @@ class WorkerHub:
         self.proc.join(timeout)
         if self.proc.is_alive():
             log.warning("worker did not exit in %.0fs; terminating", timeout)
-            self.proc.terminate()
+            self.proc.kill()        # it ignores SIGTERM (see worker_main)
 
     def _supervise(self):
         while not self._stopping:
